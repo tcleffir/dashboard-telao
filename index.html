@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     /* ================================================================
        VARIÁVEIS DA MARCA LUX
@@ -783,106 +785,93 @@
            A estrutura de dados deve ser mantida idêntica para que
            os Renderers não precisem de refatoração.
 ==================================================================== */
+/* ====================================================================
+   FIREBASE CONFIG
+   Preencha após criar o projeto em console.firebase.google.com
+   Deixe como está para usar localStorage (modo offline).
+==================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey:      'COLE_AQUI',
+  databaseURL: 'https://SEU-PROJETO-default-rtdb.firebaseio.com',
+};
+
+/* ====================================================================
+   DATASERVICE — lê do Firebase em tempo real; fallback: localStorage
+==================================================================== */
 const DataService = {
 
-  /* ------------------------------------------------------------------
-     Fase 2 → GET /rest/crm.contact.list (ou tabela customizada de equipe)
-     Retornar array de { id, nome, sobrenome, perfil:'EDN'|'Executivo', foto:null|url }
-  ------------------------------------------------------------------ */
-  getVendedores() {
-    return JSON.parse(localStorage.getItem('lux_equipe') || '[]');
+  _cache: {
+    equipe:             [],
+    eventos:            [],
+    metas:              { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 },
+    destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
+    bonus_receita:      [],
+    historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
+  },
+  _firebase: false,
+
+  _fromLS() {
+    const r = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+    if (r('lux_equipe'))             this._cache.equipe             = r('lux_equipe');
+    if (r('lux_eventos'))            this._cache.eventos            = r('lux_eventos');
+    if (r('lux_metas'))              this._cache.metas              = r('lux_metas');
+    if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior');
+    if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita');
+    if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025');
   },
 
-  saveVendedor(v) {
-    const lista = this.getVendedores();
-    const idx = lista.findIndex(x => x.id === v.id);
-    if (idx >= 0) lista[idx] = v; else lista.push(v);
-    localStorage.setItem('lux_equipe', JSON.stringify(lista));
+  _applySnap(d) {
+    if (!d) return;
+    if (Array.isArray(d.equipe))          this._cache.equipe             = d.equipe;
+    if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
+    if (d.metas)                          this._cache.metas              = d.metas;
+    if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
+    if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
+    if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
   },
 
-  removeVendedor(id) {
-    const lista = this.getVendedores().filter(v => v.id !== id);
-    localStorage.setItem('lux_equipe', JSON.stringify(lista));
+  /** Inicializa e chama onReady() quando os dados estiverem prontos */
+  init(onReady) {
+    const configured = FIREBASE_CONFIG.databaseURL &&
+                       !FIREBASE_CONFIG.databaseURL.includes('SEU-PROJETO');
+
+    if (!configured) {
+      /* Modo offline — localStorage + storage event entre abas */
+      this._fromLS();
+      window.addEventListener('storage', e => {
+        if (e.key && e.key.startsWith('lux_')) { this._fromLS(); App.refresh(); }
+      });
+      onReady();
+      return;
+    }
+
+    /* Modo Firebase — listener em tempo real */
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      this._firebase = true;
+      let first = true;
+      firebase.database().ref('lux').on('value', snap => {
+        this._applySnap(snap.val());
+        if (first) { first = false; onReady(); }
+        else        { App.refresh(); }
+      }, err => {
+        console.error('[Firebase]', err);
+        if (first) { first = false; this._fromLS(); onReady(); }
+      });
+    } catch(e) {
+      console.error('[Firebase] init falhou — usando localStorage.', e);
+      this._fromLS();
+      onReady();
+    }
   },
 
-  /* ------------------------------------------------------------------
-     Fase 2 → GET /rest/crm.activity.list (filtrar por tipo de campanha)
-     Retornar array de { id, vendedorId, data, tipo,
-       // se fechamento: nomeCliente, cidadeEstado, numUnidades, valorGestao, ednId }
-  ------------------------------------------------------------------ */
-  getEventos() {
-    return JSON.parse(localStorage.getItem('lux_eventos') || '[]');
-  },
-
-  saveEvento(e) {
-    const lista = this.getEventos();
-    lista.push(e);
-    localStorage.setItem('lux_eventos', JSON.stringify(lista));
-  },
-
-  removeEvento(id) {
-    const lista = this.getEventos().filter(e => e.id !== id);
-    localStorage.setItem('lux_eventos', JSON.stringify(lista));
-  },
-
-  /* ------------------------------------------------------------------
-     Fase 2 → GET /rest/crm.deal.list (filtrar stage = fechado)
-  ------------------------------------------------------------------ */
-  getFechamentos() {
-    return this.getEventos().filter(e => e.tipo === 'fechamento');
-  },
-
-  getMetas() {
-    const padrao = { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 };
-    return JSON.parse(localStorage.getItem('lux_metas') || JSON.stringify(padrao));
-  },
-
-  saveMetas(m) {
-    localStorage.setItem('lux_metas', JSON.stringify(m));
-  },
-
-  getDestaquesAnterior() {
-    const padrao = { mes: '', reunioes: null, fechamentos: null, receita: null };
-    return JSON.parse(localStorage.getItem('lux_destaques_anterior') || JSON.stringify(padrao));
-  },
-
-  saveDestaquesAnterior(d) {
-    localStorage.setItem('lux_destaques_anterior', JSON.stringify(d));
-  },
-
-  getBonusReceita() {
-    return JSON.parse(localStorage.getItem('lux_bonus_receita') || '[]');
-  },
-
-  saveBonusReceita(b) {
-    localStorage.setItem('lux_bonus_receita', JSON.stringify(b));
-  },
-
-  /* Histórico mensal de 2025 para o gráfico comparativo */
-  getHistorico2025() {
-    const padrao = { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) };
-    return JSON.parse(localStorage.getItem('lux_historico_2025') || JSON.stringify(padrao));
-  },
-
-  saveHistorico2025(h) {
-    localStorage.setItem('lux_historico_2025', JSON.stringify(h));
-  },
-
-  /* Export / Import completo */
-  exportData() {
-    const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
-                  'lux_bonus_receita','lux_historico_2025'];
-    const obj = {};
-    keys.forEach(k => { obj[k] = JSON.parse(localStorage.getItem(k) || 'null'); });
-    return JSON.stringify(obj, null, 2);
-  },
-
-  importData(jsonStr) {
-    const obj = JSON.parse(jsonStr);
-    Object.entries(obj).forEach(([k, v]) => {
-      if (v !== null) localStorage.setItem(k, JSON.stringify(v));
-    });
-  },
+  getVendedores()        { return this._cache.equipe; },
+  getEventos()           { return this._cache.eventos; },
+  getFechamentos()       { return this._cache.eventos.filter(e => e.tipo === 'fechamento'); },
+  getMetas()             { return this._cache.metas; },
+  getDestaquesAnterior() { return this._cache.destaques_anterior; },
+  getBonusReceita()      { return this._cache.bonus_receita; },
+  getHistorico2025()     { return this._cache.historico_2025; },
 };
 
 /* ====================================================================
@@ -1446,11 +1435,7 @@ const App = {
   init() {
     this.refresh();
     this._timer = setInterval(() => this.refresh(), this.INTERVALO_MS);
-    // Atualiza imediatamente quando o Admin salva algo em outra aba/janela
-    window.addEventListener('storage', e => {
-      if (e.key && e.key.startsWith('lux_')) this.refresh();
-    });
-    console.log('[Lux Dashboard] Iniciado. Auto-refresh a cada 60s + storage listener ativo.');
+    console.log('[Lux Dashboard] Iniciado. Auto-refresh a cada 60s.');
   },
 
   refresh() {
@@ -1608,9 +1593,14 @@ const DemoData = {
 
 /* Inicializa quando a página carregar */
 document.addEventListener('DOMContentLoaded', () => {
-  DemoData.migrate(); // migrações de esquema (idempotente)
-  DemoData.seed();    // popula dados na primeira abertura
-  App.init();
+  DemoData.migrate(); // migração de esquema (idempotente)
+  DataService.init(() => {
+    // Seed apenas no modo localStorage e somente se não houver equipe
+    if (!DataService._firebase && !DataService.getVendedores().length) {
+      DemoData.seed();
+    }
+    App.init();
+  });
 });
 </script>
 </body>

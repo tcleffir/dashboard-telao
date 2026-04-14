@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     /* ================================================================
        CONFIGURAÇÃO — altere a senha aqui
@@ -924,56 +926,143 @@
 const SENHA_ADMIN = 'lux2025';
 
 /* ====================================================================
-   DATASERVICE — mesmo contrato do index.html (Fase 1: localStorage)
-   Fase 2: substituir os métodos GET/SET por chamadas ao Bitrix24
+   FIREBASE CONFIG — mesma config do index.html
+==================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey:      'COLE_AQUI',
+  databaseURL: 'https://SEU-PROJETO-default-rtdb.firebaseio.com',
+};
+
+/* ====================================================================
+   DATASERVICE — lê/escreve no Firebase; fallback: localStorage
 ==================================================================== */
 const DataService = {
-  getVendedores()   { return JSON.parse(localStorage.getItem('lux_equipe') || '[]'); },
+
+  _cache: {
+    equipe:             [],
+    eventos:            [],
+    metas:              { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 },
+    destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
+    bonus_receita:      [],
+    historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
+  },
+  _firebase: false,
+  _db: null,
+
+  _fromLS() {
+    const r = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+    if (r('lux_equipe'))             this._cache.equipe             = r('lux_equipe')             || [];
+    if (r('lux_eventos'))            this._cache.eventos            = r('lux_eventos')            || [];
+    if (r('lux_metas'))              this._cache.metas              = r('lux_metas')              || this._cache.metas;
+    if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior') || this._cache.destaques_anterior;
+    if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita')      || [];
+    if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025')     || this._cache.historico_2025;
+  },
+
+  /** Conecta ao Firebase e chama onReady() quando os dados estiverem carregados */
+  init(onReady) {
+    const configured = FIREBASE_CONFIG.databaseURL &&
+                       !FIREBASE_CONFIG.databaseURL.includes('SEU-PROJETO');
+    if (!configured) {
+      this._fromLS();
+      onReady();
+      return;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      this._db      = firebase.database();
+      this._firebase = true;
+      this._db.ref('lux').once('value').then(snap => {
+        const d = snap.val() || {};
+        if (Array.isArray(d.equipe))          this._cache.equipe             = d.equipe;
+        if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
+        if (d.metas)                          this._cache.metas              = d.metas;
+        if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
+        if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
+        if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
+        onReady();
+      }).catch(e => { console.error('[Firebase]', e); this._fromLS(); onReady(); });
+    } catch(e) {
+      console.error('[Firebase] init falhou — usando localStorage.', e);
+      this._fromLS(); onReady();
+    }
+  },
+
+  /** Escreve no Firebase E no localStorage (localStorage serve para snapshots locais) */
+  _write(key, value) {
+    localStorage.setItem('lux_' + key, JSON.stringify(value));
+    if (this._firebase && this._db) this._db.ref('lux/' + key).set(value);
+  },
+
+  getVendedores()   { return this._cache.equipe; },
   saveVendedor(v) {
-    const l = this.getVendedores();
+    const l = this._cache.equipe;
     const i = l.findIndex(x => x.id === v.id);
     if (i >= 0) l[i] = v; else l.push(v);
-    localStorage.setItem('lux_equipe', JSON.stringify(l));
+    this._write('equipe', l);
   },
   removeVendedor(id) {
-    localStorage.setItem('lux_equipe', JSON.stringify(this.getVendedores().filter(v => v.id !== id)));
+    this._cache.equipe = this._cache.equipe.filter(v => v.id !== id);
+    this._write('equipe', this._cache.equipe);
   },
-  getEventos()      { return JSON.parse(localStorage.getItem('lux_eventos') || '[]'); },
-  saveEvento(e)     { const l = this.getEventos(); l.push(e); localStorage.setItem('lux_eventos', JSON.stringify(l)); },
-  removeEvento(id)  { localStorage.setItem('lux_eventos', JSON.stringify(this.getEventos().filter(e => e.id !== id))); },
-  getMetas()        { return JSON.parse(localStorage.getItem('lux_metas') || '{"reunioesPorEDN":10,"fechamentosPorExecutivo":2}'); },
-  saveMetas(m)      { localStorage.setItem('lux_metas', JSON.stringify(m)); },
-  getDestaquesAnterior() { return JSON.parse(localStorage.getItem('lux_destaques_anterior') || '{"mes":"","reunioes":null,"fechamentos":null,"receita":null}'); },
-  saveDestaquesAnterior(d) { localStorage.setItem('lux_destaques_anterior', JSON.stringify(d)); },
-  getBonusReceita() { return JSON.parse(localStorage.getItem('lux_bonus_receita') || '[]'); },
-  saveBonusReceita(b) { localStorage.setItem('lux_bonus_receita', JSON.stringify(b)); },
-  getHistorico2025() { return JSON.parse(localStorage.getItem('lux_historico_2025') || '{"reunioes":[0,0,0,0,0,0,0,0,0,0,0,0],"fechamentos":[0,0,0,0,0,0,0,0,0,0,0,0]}'); },
-  saveHistorico2025(h) { localStorage.setItem('lux_historico_2025', JSON.stringify(h)); },
+
+  getEventos()     { return this._cache.eventos; },
+  saveEvento(e) {
+    this._cache.eventos.push(e);
+    this._write('eventos', this._cache.eventos);
+  },
+  removeEvento(id) {
+    this._cache.eventos = this._cache.eventos.filter(e => e.id !== id);
+    this._write('eventos', this._cache.eventos);
+  },
+
+  getMetas()             { return this._cache.metas; },
+  saveMetas(m)           { this._cache.metas = m;              this._write('metas', m); },
+
+  getDestaquesAnterior() { return this._cache.destaques_anterior; },
+  saveDestaquesAnterior(d) { this._cache.destaques_anterior = d; this._write('destaques_anterior', d); },
+
+  getBonusReceita()      { return this._cache.bonus_receita; },
+  saveBonusReceita(b)    { this._cache.bonus_receita = b;     this._write('bonus_receita', b); },
+
+  getHistorico2025()     { return this._cache.historico_2025; },
+  saveHistorico2025(h)   { this._cache.historico_2025 = h;    this._write('historico_2025', h); },
+
   exportData() {
-    const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior','lux_bonus_receita','lux_historico_2025','lux_snapshots'];
+    const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
+                  'lux_bonus_receita','lux_historico_2025','lux_snapshots'];
     const obj = {};
     keys.forEach(k => { obj[k] = JSON.parse(localStorage.getItem(k) || 'null'); });
     return JSON.stringify(obj, null, 2);
   },
+
   importData(json) {
     const obj = JSON.parse(json);
+    // Escreve no Firebase
+    if (this._firebase && this._db) {
+      const fb = {};
+      const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
+                    lux_destaques_anterior:'destaques_anterior',
+                    lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
+      Object.entries(map).forEach(([lsKey, fbKey]) => {
+        if (obj[lsKey] != null) fb[fbKey] = obj[lsKey];
+      });
+      this._db.ref('lux').update(fb);
+    }
+    // Escreve no localStorage
     Object.entries(obj).forEach(([k, v]) => { if (v !== null) localStorage.setItem(k, JSON.stringify(v)); });
   },
 
-  /* ---- Snapshots / Histórico de versões ---- */
-  _getSnapshots() { return JSON.parse(localStorage.getItem('lux_snapshots') || '[]'); },
+  /* ---- Snapshots (ficam apenas no localStorage — são dados de auditoria local) ---- */
+  _getSnapshots()     { return JSON.parse(localStorage.getItem('lux_snapshots') || '[]'); },
   _saveSnapshots(arr) { localStorage.setItem('lux_snapshots', JSON.stringify(arr)); },
 
-  /** Cria um snapshot do estado atual. Grava no máximo 1 por dia automaticamente. */
   autoSnapshot(label) {
-    const snaps   = this._getSnapshots();
-    const hoje    = new Date().toLocaleDateString('pt-BR');
-    // Se já existe snapshot de hoje, não duplica (exceto se label explícito)
+    const snaps = this._getSnapshots();
+    const hoje  = new Date().toLocaleDateString('pt-BR');
     if (!label && snaps.length && snaps[0].dataLabel === hoje) return;
-    const snap = {
-      id:        Date.now(),
-      dataLabel: label || hoje,
-      timestamp: Date.now(),
+    snaps.unshift({
+      id: Date.now(), dataLabel: label || hoje, timestamp: Date.now(),
       data: {
         lux_equipe:             this.getVendedores(),
         lux_eventos:            this.getEventos(),
@@ -982,16 +1071,23 @@ const DataService = {
         lux_bonus_receita:      this.getBonusReceita(),
         lux_historico_2025:     this.getHistorico2025(),
       },
-    };
-    snaps.unshift(snap);
-    this._saveSnapshots(snaps.slice(0, 60)); // mantém últimos 60 snapshots
+    });
+    this._saveSnapshots(snaps.slice(0, 60));
   },
 
   restoreSnapshot(id) {
     const snap = this._getSnapshots().find(s => s.id === id);
     if (!snap) return false;
-    Object.entries(snap.data).forEach(([k, v]) => {
-      if (v !== null) localStorage.setItem(k, JSON.stringify(v));
+    const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
+                  lux_destaques_anterior:'destaques_anterior',
+                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
+    Object.entries(map).forEach(([lsKey, fbKey]) => {
+      const v = snap.data[lsKey];
+      if (v != null) {
+        this._cache[fbKey] = v;
+        localStorage.setItem(lsKey, JSON.stringify(v));
+        if (this._firebase && this._db) this._db.ref('lux/' + fbKey).set(v);
+      }
     });
     return true;
   },
@@ -1033,15 +1129,22 @@ const Admin = {
   ------------------------------------------------------------------ */
   login() {
     const senha = document.getElementById('campo-senha').value;
-    if (senha === SENHA_ADMIN) {
-      document.getElementById('tela-login').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('login-erro').style.display = 'none';
-      this.inicializar();
-    } else {
+    if (senha !== SENHA_ADMIN) {
       document.getElementById('login-erro').style.display = 'block';
       document.getElementById('campo-senha').value = '';
+      return;
     }
+    // Mostra loading enquanto Firebase conecta
+    const btn = document.querySelector('#tela-login .btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
+
+    DataService.init(() => {
+      if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
+      document.getElementById('tela-login').style.display = 'none';
+      document.getElementById('app').style.display        = 'block';
+      document.getElementById('login-erro').style.display = 'none';
+      this.inicializar();
+    });
   },
 
   logout() {
@@ -1064,16 +1167,14 @@ const Admin = {
   inicializar() {
     /* Migração: corrige perfil da Luana para 'Ambos' se necessário */
     (() => {
-      const raw = localStorage.getItem('lux_equipe');
-      if (!raw) return;
-      const eq = JSON.parse(raw);
+      const eq = DataService.getVendedores();
       let changed = false;
       eq.forEach(v => {
         if (v.nome === 'Luana' && v.sobrenome === 'Furtado' && v.perfil !== 'Ambos') {
           v.perfil = 'Ambos'; changed = true;
         }
       });
-      if (changed) localStorage.setItem('lux_equipe', JSON.stringify(eq));
+      if (changed) DataService._write('equipe', eq);
     })();
     this.carregar_equipe();
     this.carregar_eventos();
