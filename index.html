@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velocidade da Lux 2.0 — Telão</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ================================================================
+       VARIÁVEIS DA MARCA LUX
+    ================================================================ */
+    :root {
+      --azul-1: #0B2A3D;
+      --azul-2: #1F4E6B;
+      --azul-3: #2F6F8F;
+      --azul-4: #4F7F99;
+      --verde-1: #0F3834;
+      --verde-2: #4E7D5B;
+      --verde-3: #8BC34A;
+      --neutro-1: #E6ECEF;
+      --neutro-2: #FBFFEF;
+      --branco: #FFFFFF;
+      --cinza: #6B7C88;
+
+      /* Glass system */
+      --glass-bg: rgba(255, 255, 255, 0.07);
+      --glass-bg-hover: rgba(255, 255, 255, 0.11);
+      --glass-border: rgba(255, 255, 255, 0.13);
+      --glass-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+      --glass-green: rgba(139, 195, 74, 0.14);
+      --glass-green-border: rgba(139, 195, 74, 0.28);
+      --glass-gold: rgba(255, 200, 0, 0.10);
+      --glass-gold-border: rgba(255, 200, 0, 0.22);
+    }
+
+    /* ================================================================
+       RESET & BASE
+    ================================================================ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Montserrat', sans-serif;
+      /* Cor da moldura física das TVs — aparece nas junções */
+      background: #060f18;
+      color: white;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ================================================================
+       GRID PRINCIPAL — 4 TVs em 2×2
+       O gap simula as molduras físicas das televisões se encontrando.
+       O background escuro do body aparece nas junções como "bezel".
+    ================================================================ */
+    #dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 10px;           /* espessura da junção entre as TVs */
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      padding: 0;          /* TVs vão até a borda — sem margem externa */
+    }
+
+    
+
+    /* ================================================================
+       QUADRANTES — cada um é uma TV independente
+    ================================================================ */
+    .quadrant {
+      /* Sem width/height fixo — o grid 1fr×1fr cuida disso */
+      padding: 16px 18px 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      /* Fundo de cada "tela" com gradiente da Lux */
+      background: linear-gradient(145deg, #0d2235 0%, #182f45 55%, #0d2820 100%);
+      /* Bordas arredondadas simulam o leve chanfro das telas modernas */
+      border-radius: 3px;
+      /* Sombra interna simula profundidade de tela + brilho de borda */
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,0.07),
+        inset 0 1px 0 rgba(255,255,255,0.12),
+        0 0 40px rgba(0,0,0,0.6);
+    }
+
+    /* ================================================================
+       GLASS — COMPONENTE BASE
+    ================================================================ */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      box-shadow: var(--glass-shadow);
+    }
+
+    .glass-green {
+      background: var(--glass-green);
+      border-color: var(--glass-green-border);
+    }
+
+    .glass-gold {
+      background: var(--glass-gold);
+      border-color: var(--glass-gold-border);
+    }
+
+    /* ================================================================
+       CABEÇALHO DE QUADRANTE
+    ================================================================ */
+    .quad-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      padding-bottom: 4px;
+    }
+
+    .quad-header h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.65);
+    }
+
+    .live-badge {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--verde-3);
+      letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--verde-3);
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ================================================================
+       Q1 — RANKING GERAL
+    ================================================================ */
+    .ranking-container {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .ranking-divider {
+      background: rgba(255,255,255,0.08);
+      align-self: stretch;
+    }
+
+    .ranking-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .ranking-panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      flex-shrink: 0;
+    }
+
+    .ranking-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    /* Linha de pessoa no ranking */
+    .pessoa-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      transition: all 0.4s ease;
+      animation: rowEntrada 0.4s ease forwards;
+    }
+
+    @keyframes rowEntrada {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .pessoa-row.ouro   { background: var(--glass-gold);  border: 1px solid var(--glass-gold-border); }
+    .pessoa-row.prata  { background: rgba(192,192,192,0.08); border: 1px solid rgba(192,192,192,0.18); }
+    .pessoa-row.bronze { background: rgba(205,127,50,0.08); border: 1px solid rgba(205,127,50,0.18); }
+    .pessoa-row.normal { background: var(--glass-bg); border: 1px solid var(--glass-border); }
+    .pessoa-row.destaque-exec { background: var(--glass-gold); border: 1px solid var(--glass-gold-border); }
+
+    .medal-badge { font-size: 18px; flex-shrink: 0; width: 20px; text-align: center; }
+    .pos-num { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.35); width: 16px; text-align: center; flex-shrink: 0; }
+
+    /* Avatar */
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--azul-3), var(--azul-4));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Informações da pessoa */
+    .pessoa-info { flex: 1; min-width: 0; }
+
+    .pessoa-nome {
+      font-size: 15px;
+      font-weight: 600;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+
+    .pessoa-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 2px;
+      white-space: nowrap;
+    }
+
+    /* Barra de progresso */
+    .progress-wrap {
+      width: 60px;
+      flex-shrink: 0;
+    }
+
+    .progress-track {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--azul-4), var(--verde-3));
+      transition: width 1s ease;
+    }
+
+    /* Métrica principal */
+    .pessoa-valor {
+      font-size: 16px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* Indicador de ultrapassagem */
+    .up-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--verde-3);
+      background: rgba(139,195,74,0.18);
+      border: 1px solid rgba(139,195,74,0.3);
+      padding: 2px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ================================================================
+       Q2 — FUNIL & FECHAMENTOS
+    ================================================================ */
+    .q2-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .chart-area {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .chart-box {
+      flex: 1;
+      padding: 10px 12px 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .chart-box-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      flex-shrink: 0;
+      margin-bottom: 8px;
+    }
+
+    .chart-box canvas {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Legenda do gráfico */
+    .chart-legenda {
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    .legenda-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+    }
+
+    .legenda-dot {
+      width: 8px;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    /* Fechamentos recentes */
+    .fechamentos-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      flex-shrink: 0;
+    }
+
+    .fechamentos-list {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .fechamento-card {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      justify-content: center;
+    }
+
+    .fech-cliente {
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fech-local {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .fech-valor {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--verde-3);
+      margin-top: 2px;
+    }
+
+    .fech-unidades {
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+    }
+
+    .fech-exec {
+      font-size: 11px;
+      color: var(--azul-4);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .fech-edn {
+      font-size: 11px;
+      color: var(--verde-3);
+      font-weight: 500;
+    }
+
+    /* ================================================================
+       Q3 — DESTAQUES + FECHAMENTOS
+    ================================================================ */
+    .q3-body {
+      flex: 1;
+      min-height: 0;           /* impede overflow no flexbox pai */
+      display: grid;
+      grid-template-rows: 38fr 1px 62fr;  /* ~38% destaques (3 linhas) / ~62% fechamentos */
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .destaques-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .fechamentos-q3 {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Destaque: linha horizontal — ícone | categoria | avatar | nome | valor */
+    .destaque-row {
+      flex: 1;
+      min-height: 0;
+      padding: 0 14px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .dest-icone {
+      font-size: 26px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .dest-categoria {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      width: 100px;
+      flex-shrink: 0;
+    }
+
+    .dest-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--azul-3), var(--azul-4));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.18);
+      flex-shrink: 0;
+    }
+
+    .dest-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .dest-nome {
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dest-valor {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--verde-3);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .dest-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    /* Separador entre destaques e fechamentos em Q3 */
+    .q3-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+
+
+
+    /* ================================================================
+       Q4 — META DO MÊS
+    ================================================================ */
+    .metas-container {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .meta-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .meta-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow: hidden;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      transition: all 0.4s ease;
+    }
+
+    .meta-row.batida {
+      background: var(--glass-green);
+      border: 1px solid var(--glass-green-border);
+    }
+
+    .meta-row.nao-batida {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+    }
+
+    .meta-info { flex: 1; min-width: 0; }
+
+    .meta-nome {
+      font-size: 13px;
+      font-weight: 600;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta-progresso-track {
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 3px;
+    }
+
+    .meta-progresso-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 1s ease;
+    }
+
+    .meta-progresso-fill.ok    { background: linear-gradient(90deg, var(--verde-2), var(--verde-3)); }
+    .meta-progresso-fill.parcial { background: linear-gradient(90deg, var(--azul-3), var(--azul-4)); }
+
+    .meta-contagem {
+      font-size: 14px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.7);
+      flex-shrink: 0;
+      min-width: 32px;
+      text-align: right;
+    }
+
+    .meta-check {
+      font-size: 14px;
+      flex-shrink: 0;
+      animation: checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes checkPop {
+      0%   { transform: scale(0) rotate(-20deg); }
+      70%  { transform: scale(1.25) rotate(5deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
+
+    .meta-rodape {
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      font-weight: 500;
+      flex-shrink: 0;
+      padding: 3px 2px 0;
+    }
+
+    /* ================================================================
+       EMPTY STATE
+    ================================================================ */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 6px;
+      color: rgba(255,255,255,0.25);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .empty-state .empty-icon { font-size: 22px; opacity: 0.4; }
+  </style>
+</head>
+<body>
+
+<div id="dashboard">
+
+  <!-- =====================================================
+       Q1 — RANKING GERAL AO VIVO  (superior esquerdo)
+  ====================================================== -->
+  <section class="quadrant" id="q1">
+    <div class="quad-header">
+      <h2>Ranking Geral ao Vivo</h2>
+      <span class="live-badge"><span class="live-dot"></span>AO VIVO</span>
+    </div>
+    <div class="ranking-container">
+      <!-- EDNs -->
+      <div class="ranking-panel">
+        <div class="ranking-panel-title">EDNs — Reuniões Realizadas</div>
+        <div class="ranking-list" id="ranking-edns"></div>
+      </div>
+      <div class="ranking-divider"></div>
+      <!-- Executivos -->
+      <div class="ranking-panel">
+        <div class="ranking-panel-title">Executivos — Receita</div>
+        <div class="ranking-list" id="ranking-execs"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       Q2 — FUNIL & FECHAMENTOS  (superior direito)
+  ====================================================== -->
+  <section class="quadrant" id="q2">
+    <div class="quad-header">
+      <h2>Funil de Vendas — Comparativo</h2>
+    </div>
+    <div class="q2-body">
+      <!-- Gráficos comparativos -->
+      <div class="chart-area">
+        <div class="chart-box glass" id="chart-box-reunioes">
+          <div class="chart-box-title">Reuniões Realizadas</div>
+          <canvas id="chart-reunioes"></canvas>
+          <div class="chart-legenda" id="legenda-reunioes"></div>
+        </div>
+        <div class="chart-box glass" id="chart-box-fechamentos">
+          <div class="chart-box-title">Fechamentos</div>
+          <canvas id="chart-fechamentos"></canvas>
+          <div class="chart-legenda" id="legenda-fechamentos"></div>
+        </div>
+      </div>
+      <!-- fechamentos movidos para Q3 -->
+    </div>
+  </section>
+
+  <!-- =====================================================
+       Q3 — DESTAQUES DO MÊS ANTERIOR  (inferior esquerdo)
+  ====================================================== -->
+  <section class="quadrant" id="q3">
+    <div class="quad-header">
+      <h2 id="destaques-titulo">Destaques do Mês Anterior</h2>
+    </div>
+    <div class="q3-body">
+      <div class="destaques-container" id="destaques-container"></div>
+      <div class="q3-divider"></div>
+      <div class="fechamentos-q3">
+        <div class="section-title">Últimos Fechamentos do Mês</div>
+        <div class="fechamentos-list" id="lista-fechamentos"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       Q4 — META DO MÊS  (inferior direito)
+  ====================================================== -->
+  <section class="quadrant" id="q4">
+    <div class="quad-header">
+      <h2>Meta do Mês</h2>
+    </div>
+    <div class="metas-container">
+      <div class="meta-panel">
+        <div class="ranking-panel-title">EDNs — Reuniões</div>
+        <div class="meta-list" id="meta-edns"></div>
+        <div class="meta-rodape" id="rodape-edns"></div>
+      </div>
+      <div class="ranking-divider"></div>
+      <div class="meta-panel">
+        <div class="ranking-panel-title">Executivos — Fechamentos</div>
+        <div class="meta-list" id="meta-execs"></div>
+        <div class="meta-rodape" id="rodape-execs"></div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- #dashboard -->
+
+<script>
+'use strict';
+
+/* ====================================================================
+   DATASERVICE — CAMADA DE ABSTRAÇÃO
+   Fase 1: lê/escreve no localStorage
+   Fase 2: substituir os métodos GET por chamadas à API do Bitrix24.
+           Endpoints sugeridos estão comentados em cada método.
+           A estrutura de dados deve ser mantida idêntica para que
+           os Renderers não precisem de refatoração.
+==================================================================== */
+const DataService = {
+
+  /* ------------------------------------------------------------------
+     Fase 2 → GET /rest/crm.contact.list (ou tabela customizada de equipe)
+     Retornar array de { id, nome, sobrenome, perfil:'EDN'|'Executivo', foto:null|url }
+  ------------------------------------------------------------------ */
+  getVendedores() {
+    return JSON.parse(localStorage.getItem('lux_equipe') || '[]');
+  },
+
+  saveVendedor(v) {
+    const lista = this.getVendedores();
+    const idx = lista.findIndex(x => x.id === v.id);
+    if (idx >= 0) lista[idx] = v; else lista.push(v);
+    localStorage.setItem('lux_equipe', JSON.stringify(lista));
+  },
+
+  removeVendedor(id) {
+    const lista = this.getVendedores().filter(v => v.id !== id);
+    localStorage.setItem('lux_equipe', JSON.stringify(lista));
+  },
+
+  /* ------------------------------------------------------------------
+     Fase 2 → GET /rest/crm.activity.list (filtrar por tipo de campanha)
+     Retornar array de { id, vendedorId, data, tipo,
+       // se fechamento: nomeCliente, cidadeEstado, numUnidades, valorGestao, ednId }
+  ------------------------------------------------------------------ */
+  getEventos() {
+    return JSON.parse(localStorage.getItem('lux_eventos') || '[]');
+  },
+
+  saveEvento(e) {
+    const lista = this.getEventos();
+    lista.push(e);
+    localStorage.setItem('lux_eventos', JSON.stringify(lista));
+  },
+
+  removeEvento(id) {
+    const lista = this.getEventos().filter(e => e.id !== id);
+    localStorage.setItem('lux_eventos', JSON.stringify(lista));
+  },
+
+  /* ------------------------------------------------------------------
+     Fase 2 → GET /rest/crm.deal.list (filtrar stage = fechado)
+  ------------------------------------------------------------------ */
+  getFechamentos() {
+    return this.getEventos().filter(e => e.tipo === 'fechamento');
+  },
+
+  getMetas() {
+    const padrao = { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 };
+    return JSON.parse(localStorage.getItem('lux_metas') || JSON.stringify(padrao));
+  },
+
+  saveMetas(m) {
+    localStorage.setItem('lux_metas', JSON.stringify(m));
+  },
+
+  getDestaquesAnterior() {
+    const padrao = { mes: '', reunioes: null, fechamentos: null, receita: null };
+    return JSON.parse(localStorage.getItem('lux_destaques_anterior') || JSON.stringify(padrao));
+  },
+
+  saveDestaquesAnterior(d) {
+    localStorage.setItem('lux_destaques_anterior', JSON.stringify(d));
+  },
+
+  getBonusReceita() {
+    return JSON.parse(localStorage.getItem('lux_bonus_receita') || '[]');
+  },
+
+  saveBonusReceita(b) {
+    localStorage.setItem('lux_bonus_receita', JSON.stringify(b));
+  },
+
+  /* Histórico mensal de 2025 para o gráfico comparativo */
+  getHistorico2025() {
+    const padrao = { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) };
+    return JSON.parse(localStorage.getItem('lux_historico_2025') || JSON.stringify(padrao));
+  },
+
+  saveHistorico2025(h) {
+    localStorage.setItem('lux_historico_2025', JSON.stringify(h));
+  },
+
+  /* Export / Import completo */
+  exportData() {
+    const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
+                  'lux_bonus_receita','lux_historico_2025'];
+    const obj = {};
+    keys.forEach(k => { obj[k] = JSON.parse(localStorage.getItem(k) || 'null'); });
+    return JSON.stringify(obj, null, 2);
+  },
+
+  importData(jsonStr) {
+    const obj = JSON.parse(jsonStr);
+    Object.entries(obj).forEach(([k, v]) => {
+      if (v !== null) localStorage.setItem(k, JSON.stringify(v));
+    });
+  },
+};
+
+/* ====================================================================
+   UTILS — funções auxiliares
+==================================================================== */
+const Utils = {
+  /* Gera iniciais a partir do nome completo */
+  iniciais(nomeCompleto) {
+    const partes = nomeCompleto.trim().split(' ').filter(Boolean);
+    if (!partes.length) return '?';
+    if (partes.length === 1) return partes[0][0].toUpperCase();
+    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+  },
+
+  /* Formata valor monetário em R$ */
+  formataMoeda(valor) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency', currency: 'BRL',
+      minimumFractionDigits: 0, maximumFractionDigits: 0
+    }).format(valor);
+  },
+
+  /* Retorna mês atual 0-based */
+  mesAtual() { return new Date().getMonth(); },
+
+  /* Nomes curtos dos meses */
+  MESES: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
+
+  /* Gera ID único */
+  uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); },
+
+  /* Mês por extenso */
+  mesExtenso(m) {
+    const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    return nomes[m] || '';
+  },
+
+  /* Cria elemento HTML de avatar */
+  criaAvatar(vendedor, tamanho = 30) {
+    const el = document.createElement('div');
+    el.className = 'avatar';
+    el.style.width = el.style.height = tamanho + 'px';
+    el.style.fontSize = Math.round(tamanho * 0.35) + 'px';
+    if (vendedor && vendedor.foto) {
+      const img = document.createElement('img');
+      img.src = vendedor.foto;
+      img.onerror = () => { el.textContent = Utils.iniciais(`${vendedor.nome} ${vendedor.sobrenome}`); };
+      el.appendChild(img);
+    } else if (vendedor) {
+      el.textContent = Utils.iniciais(`${vendedor.nome} ${vendedor.sobrenome}`);
+    } else {
+      el.textContent = '?';
+    }
+    return el;
+  },
+};
+
+/* ====================================================================
+   RANKING ENGINE — cálculos de pontuação e métricas
+==================================================================== */
+const RankingEngine = {
+
+  /* Tabela de pontos por tipo de evento */
+  PONTOS: {
+    prospeccao:         1,
+    reuniao_agendada:   3,
+    reuniao_realizada:  5,
+    fechamento:        20,
+  },
+
+  /* Calcula bonus de receita por faixas configuradas */
+  bonusReceita(valor) {
+    const faixas = DataService.getBonusReceita();
+    for (const f of faixas) {
+      if (valor >= f.faixaMin && (f.faixaMax === null || valor <= f.faixaMax)) {
+        return f.pontos;
+      }
+    }
+    return 0;
+  },
+
+  /* Agrega métricas por vendedor */
+  calcularEstatisticas() {
+    const vendedores = DataService.getVendedores();
+    const eventos = DataService.getEventos();
+
+    const stats = {};
+    vendedores.forEach(v => {
+      stats[v.id] = {
+        vendedor: v,
+        pontos: 0,
+        prospeccoes: 0,
+        reunioesAgendadas: 0,
+        reunioesRealizadas: 0,
+        fechamentos: 0,
+        totalReceita: 0,
+        ultimoFechamento: null,
+      };
+    });
+
+    eventos.forEach(e => {
+      if (!stats[e.vendedorId]) return;
+      const s = stats[e.vendedorId];
+      s.pontos += (this.PONTOS[e.tipo] || 0);
+
+      if (e.tipo === 'prospeccao')          s.prospeccoes++;
+      if (e.tipo === 'reuniao_agendada')    s.reunioesAgendadas++;
+      if (e.tipo === 'reuniao_realizada')   s.reunioesRealizadas++;
+      if (e.tipo === 'fechamento') {
+        s.fechamentos++;
+        s.totalReceita += (e.valorGestao || 0);
+        s.pontos += this.bonusReceita(e.valorGestao || 0);
+        if (!s.ultimoFechamento || e.data > s.ultimoFechamento.data)
+          s.ultimoFechamento = e;
+      }
+    });
+
+    return Object.values(stats);
+  },
+
+  /* Ranking de EDNs por reuniões realizadas */
+  rankingEDNs() {
+    return this.calcularEstatisticas()
+      .filter(s => s.vendedor.perfil === 'EDN' || s.vendedor.perfil === 'Ambos')
+      .sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas || b.pontos - a.pontos);
+  },
+
+  /* Ranking de Executivos por receita gerada */
+  rankingExecutivos() {
+    return this.calcularEstatisticas()
+      .filter(s => s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos')
+      .sort((a, b) => b.totalReceita - a.totalReceita || b.fechamentos - a.fechamentos);
+  },
+
+  /* Últimos N fechamentos do mês corrente */
+  ultimosFechamentosMes(n = 3) {
+    const mesAtual = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    return DataService.getFechamentos()
+      .filter(e => e.data && e.data.startsWith(mesAtual))
+      .sort((a, b) => b.data.localeCompare(a.data))
+      .slice(0, n);
+  },
+
+  /* Dados mensais do ano passado e deste ano para o gráfico */
+  dadosGrafico() {
+    const hist = DataService.getHistorico2025();
+    const eventos = DataService.getEventos();
+    const mesAtual = Utils.mesAtual(); // 0-based
+
+    const reunioes2026 = Array(12).fill(0);
+    const fechamentos2026 = Array(12).fill(0);
+
+    eventos.forEach(e => {
+      if (!e.data || !e.data.startsWith('2026-')) return;
+      const mes = parseInt(e.data.split('-')[1]) - 1;
+      if (e.tipo === 'reuniao_realizada') reunioes2026[mes]++;
+      if (e.tipo === 'fechamento')         fechamentos2026[mes]++;
+    });
+
+    /* Projeção linear: média dos meses concluídos × 12 */
+    const projReun   = this._projetar(reunioes2026, mesAtual);
+    const projFech   = this._projetar(fechamentos2026, mesAtual);
+
+    return {
+      reunioes:  { hist2025: hist.reunioes,   real2026: reunioes2026,   proj2026: projReun },
+      fechamentos:{ hist2025: hist.fechamentos,real2026: fechamentos2026, proj2026: projFech },
+      mesAtual,
+    };
+  },
+
+  _projetar(dados, mesAtual) {
+    const soma = dados.slice(0, mesAtual + 1).reduce((a, b) => a + b, 0);
+    const media = soma / (mesAtual + 1);
+    return dados.map((v, i) => (i <= mesAtual ? v : Math.round(media)));
+  },
+};
+
+/* ====================================================================
+   CHARTS — gestão dos gráficos Chart.js
+==================================================================== */
+const Charts = {
+  instancias: {},
+
+  COR_2025_LINHA:    'rgba(79, 127, 153, 0.9)',
+  COR_2026_LINHA:    'rgba(139, 195, 74, 0.9)',
+  COR_PROJ_LINHA:    'rgba(139, 195, 74, 0.4)',
+  COR_2025_FILL:     'rgba(79, 127, 153, 0.15)',
+  COR_2026_FILL:     'rgba(139, 195, 74, 0.12)',
+
+  defaultOptions(mesAtual) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: {
+          ticks: {
+            font: { family: 'Montserrat', size: 8, weight: '600' },
+            color: 'rgba(255,255,255,0.4)',
+            maxRotation: 0,
+          },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          border: { color: 'rgba(255,255,255,0.1)' },
+        },
+        y: {
+          ticks: {
+            font: { family: 'Montserrat', size: 8 },
+            color: 'rgba(255,255,255,0.4)',
+            maxTicksLimit: 5,
+            stepSize: 1,
+          },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          border: { color: 'rgba(255,255,255,0.1)' },
+          beginAtZero: true,
+        },
+      },
+    };
+  },
+
+  renderizar(dados) {
+    const meses = Utils.MESES;
+    const { reunioes, fechamentos, mesAtual } = dados;
+
+    this._renderGrafico('chart-reunioes', meses, reunioes,  mesAtual, 'legenda-reunioes');
+    this._renderGrafico('chart-fechamentos', meses, fechamentos, mesAtual, 'legenda-fechamentos');
+  },
+
+  _renderGrafico(canvasId, meses, dados, mesAtual, legendaId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const datasets = [
+      {
+        label: '2025',
+        data: dados.hist2025,
+        borderColor: this.COR_2025_LINHA,
+        backgroundColor: this.COR_2025_FILL,
+        borderWidth: 2,
+        pointRadius: 2,
+        fill: false,
+        tension: 0.3,
+      },
+      {
+        label: '2026 Real',
+        data: dados.real2026,
+        borderColor: this.COR_2026_LINHA,
+        backgroundColor: this.COR_2026_FILL,
+        borderWidth: 2,
+        pointRadius: 2,
+        fill: false,
+        tension: 0.3,
+      },
+      {
+        label: '2026 Proj.',
+        data: dados.proj2026,
+        borderColor: this.COR_PROJ_LINHA,
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+      },
+    ];
+
+    if (this.instancias[canvasId]) {
+      const chart = this.instancias[canvasId];
+      chart.data.datasets = datasets;
+      chart.update('none');
+    } else {
+      this.instancias[canvasId] = new Chart(canvas, {
+        type: 'line',
+        data: { labels: meses, datasets },
+        options: this.defaultOptions(mesAtual),
+      });
+    }
+
+    /* Legenda manual */
+    const legendaEl = document.getElementById(legendaId);
+    if (legendaEl) {
+      legendaEl.innerHTML = [
+        { cor: this.COR_2025_LINHA, label: '2025' },
+        { cor: this.COR_2026_LINHA, label: '2026 Real' },
+        { cor: this.COR_PROJ_LINHA, label: '2026 Proj.', dashed: true },
+      ].map(l => `
+        <div class="legenda-item">
+          <div class="legenda-dot" style="background:${l.cor}; ${l.dashed ? 'border-top:2px dashed '+l.cor+';background:transparent;' : ''}"></div>
+          ${l.label}
+        </div>
+      `).join('');
+    }
+  },
+};
+
+/* ====================================================================
+   ESTADO DE ULTRAPASSAGEM
+   Guarda posições anteriores para detectar mudanças
+==================================================================== */
+const UltrapassagemState = {
+  posAnteriorEDN:  {}, // { vendedorId: posição 1-based }
+  posAnteriorExec: {},
+  alertasAtivos:   {}, // { vendedorId: timeoutId }
+
+  atualizar(rankEDNs, rankExecs) {
+    const novasPosEDN  = {};
+    const novasPosExec = {};
+
+    rankEDNs.forEach((s, i)  => novasPosEDN[s.vendedor.id]  = i + 1);
+    rankExecs.forEach((s, i) => novasPosExec[s.vendedor.id] = i + 1);
+
+    const mudancas = {};
+
+    Object.entries(novasPosEDN).forEach(([id, novaPos]) => {
+      const anteriorPos = this.posAnteriorEDN[id];
+      if (anteriorPos && anteriorPos > novaPos) {
+        mudancas[id] = anteriorPos - novaPos; // quantas posições subiu
+      }
+    });
+
+    this.posAnteriorEDN  = novasPosEDN;
+    this.posAnteriorExec = novasPosExec;
+    return mudancas;
+  },
+};
+
+/* ====================================================================
+   RENDERERS — funções de renderização de cada quadrante
+==================================================================== */
+const Renderers = {
+
+  /* --- Q1: RANKING ------------------------------------------------ */
+  q1() {
+    const rankEDNs  = RankingEngine.rankingEDNs();
+    const rankExecs = RankingEngine.rankingExecutivos();
+    const mudancas  = UltrapassagemState.atualizar(rankEDNs, rankExecs);
+
+    this._renderRankingEDNs(rankEDNs, mudancas);
+    this._renderRankingExecs(rankExecs);
+  },
+
+  _renderRankingEDNs(ranking, mudancas) {
+    const container = document.getElementById('ranking-edns');
+    if (!container) return;
+
+    const maxVal = ranking.length ? ranking[0].reunioesRealizadas : 1;
+
+    if (!ranking.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Nenhum EDN cadastrado</div>';
+      return;
+    }
+
+    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
+      const classe = i === 0 ? 'ouro' : i === 1 ? 'prata' : i === 2 ? 'bronze' : 'normal';
+      const medal  = i === 0 ? '🥇'   : i === 1 ? '🥈'   : i === 2 ? '🥉'    : null;
+      const pct    = maxVal > 0 ? Math.round((s.reunioesRealizadas / maxVal) * 100) : 0;
+      const up     = mudancas[s.vendedor.id];
+      const avatarHTML = s.vendedor.foto
+        ? `<div class="avatar"><img src="${s.vendedor.foto}" alt=""></div>`
+        : `<div class="avatar">${Utils.iniciais(s.vendedor.nome + ' ' + s.vendedor.sobrenome)}</div>`;
+
+      return `
+        <div class="pessoa-row ${classe}">
+          ${medal ? `<span class="medal-badge">${medal}</span>` : `<span class="pos-num">${i+1}</span>`}
+          ${avatarHTML}
+          <div class="pessoa-info">
+            <div class="pessoa-nome">${s.vendedor.nome} ${s.vendedor.sobrenome}</div>
+            <div class="pessoa-sub">${s.reunioesRealizadas} reuniões</div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          </div>
+          <div class="pessoa-valor">${s.reunioesRealizadas}</div>
+          ${up ? `<div class="up-badge">↑${up}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    /* Remove badges de ultrapassagem após 30s */
+    if (Object.keys(mudancas).length) {
+      setTimeout(() => Renderers.q1(), 30000);
+    }
+  },
+
+  _renderRankingExecs(ranking) {
+    const container = document.getElementById('ranking-execs');
+    if (!container) return;
+
+    if (!ranking.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>Nenhum Executivo cadastrado</div>';
+      return;
+    }
+
+    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
+      const classe = i === 0 ? 'destaque-exec' : 'normal';
+      const medal  = i === 0 ? '🥇' : null;
+      const avatarHTML = s.vendedor.foto
+        ? `<div class="avatar"><img src="${s.vendedor.foto}" alt=""></div>`
+        : `<div class="avatar">${Utils.iniciais(s.vendedor.nome + ' ' + s.vendedor.sobrenome)}</div>`;
+
+      return `
+        <div class="pessoa-row ${classe}">
+          ${medal ? `<span class="medal-badge">${medal}</span>` : `<span class="pos-num">${i+1}</span>`}
+          ${avatarHTML}
+          <div class="pessoa-info">
+            <div class="pessoa-nome">${s.vendedor.nome} ${s.vendedor.sobrenome}</div>
+            <div class="pessoa-sub">${s.fechamentos} fech. · ${Utils.formataMoeda(s.totalReceita)}</div>
+          </div>
+          <div class="pessoa-valor" style="font-size:10px;min-width:60px">${Utils.formataMoeda(s.totalReceita)}</div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  /* --- Q2: FUNIL DE VENDAS — só gráficos (fechamentos estão no Q3) */
+  q2() {
+    const dados = RankingEngine.dadosGrafico();
+    Charts.renderizar(dados);
+  },
+
+  /* --- Q3: DESTAQUES + FECHAMENTOS -------------------------------- */
+  q3() {
+    /* -- Destaques do mês anterior -- */
+    const d = DataService.getDestaquesAnterior();
+    const container = document.getElementById('destaques-container');
+    const titulo = document.getElementById('destaques-titulo');
+    if (!container) return;
+
+    if (d.mes) titulo.textContent = `Destaques — ${d.mes}`;
+
+    const cards = [
+      { key: 'reunioes',    icone: '🤝', categoria: 'Mais Reuniões',    labelSufixo: 'reuniões'  },
+      { key: 'fechamentos', icone: '🏆', categoria: 'Mais Fechamentos', labelSufixo: 'fechamentos' },
+      { key: 'receita',     icone: '💰', categoria: 'Maior Receita',    labelSufixo: '',          isMoeda: true },
+    ];
+
+    if (!d.reunioes && !d.fechamentos && !d.receita) {
+      container.innerHTML = `<div class="empty-state" style="width:100%;height:100%"><div class="empty-icon">🏅</div>Destaques a definir no Admin</div>`;
+    } else {
+      container.innerHTML = cards.map(c => {
+        const info = d[c.key];
+        if (!info) return `
+          <div class="destaque-row glass">
+            <div class="dest-icone">${c.icone}</div>
+            <div class="dest-categoria">${c.categoria}</div>
+            <div class="dest-nome" style="color:rgba(255,255,255,0.35)">A definir</div>
+          </div>`;
+        const iniciais = Utils.iniciais(info.nome || '?');
+        const valorFmt = c.isMoeda ? Utils.formataMoeda(info.valor) : `${info.valor}`;
+        const sufixo   = !c.isMoeda ? `<div class="dest-label">${info.valor} ${c.labelSufixo}</div>` : '';
+        return `
+          <div class="destaque-row glass glass-green">
+            <div class="dest-icone">${c.icone}</div>
+            <div class="dest-categoria">${c.categoria}</div>
+            <div class="dest-avatar">${iniciais}</div>
+            <div class="dest-nome">${info.nome || '—'}</div>
+            <div class="dest-valor">${valorFmt}</div>
+            ${sufixo}
+          </div>`;
+      }).join('');
+    }
+
+    /* -- Últimos fechamentos do mês (movidos do Q2) -- */
+    const fechContainer = document.getElementById('lista-fechamentos');
+    if (!fechContainer) return;
+
+    const vendedores = DataService.getVendedores();
+    const findVend = id => vendedores.find(v => v.id === id);
+    const fechamentos = RankingEngine.ultimosFechamentosMes(3);
+
+    if (!fechamentos.length) {
+      fechContainer.innerHTML = '<div class="empty-state" style="width:100%"><div class="empty-icon">🤝</div>Nenhum fechamento este mês</div>';
+      return;
+    }
+
+    fechContainer.innerHTML = fechamentos.map(f => {
+      const exec    = findVend(f.vendedorId);
+      const edn     = f.ednId ? findVend(f.ednId) : null;
+      const execNome = exec ? `${exec.nome} ${exec.sobrenome}` : '—';
+      const ednNome  = edn  ? `via ${edn.nome} ${edn.sobrenome}` : '';
+      return `
+        <div class="fechamento-card glass">
+          <div class="fech-cliente">${f.nomeCliente || '—'}</div>
+          <div class="fech-local">${f.cidadeEstado || ''}</div>
+          <div class="fech-valor">${Utils.formataMoeda(f.valorGestao || 0)}</div>
+          <div class="fech-unidades">${f.numUnidades ? f.numUnidades + ' unidades' : ''}</div>
+          <div class="fech-exec">✦ ${execNome}</div>
+          ${ednNome ? `<div class="fech-edn">${ednNome}</div>` : ''}
+        </div>`;
+    }).join('');
+  },
+
+  /* --- Q4: META DO MÊS ------------------------------------------ */
+  q4() {
+    const metas    = DataService.getMetas();
+    const stats    = RankingEngine.calcularEstatisticas();
+    const edns     = stats.filter(s => s.vendedor.perfil === 'EDN'       || s.vendedor.perfil === 'Ambos');
+    const execs    = stats.filter(s => s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos');
+
+    this._renderMetaPanel('meta-edns', 'rodape-edns', edns,
+      s => s.reunioesRealizadas, metas.reunioesPorEDN, 'reuniões');
+
+    this._renderMetaPanel('meta-execs', 'rodape-execs', execs,
+      s => s.fechamentos, metas.fechamentosPorExecutivo, 'fechamentos');
+  },
+
+  _renderMetaPanel(listId, rodapeId, stats, metricFn, metaValor, label) {
+    const container = document.getElementById(listId);
+    const rodape    = document.getElementById(rodapeId);
+    if (!container) return;
+
+    if (!stats.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div>Sem membros cadastrados</div>';
+      if (rodape) rodape.textContent = '';
+      return;
+    }
+
+    let totalRealizado = 0;
+    const totalMeta    = stats.length * metaValor;
+
+    container.innerHTML = stats.map(s => {
+      const realizado = metricFn(s);
+      totalRealizado += realizado;
+      const pct     = Math.min(100, metaValor > 0 ? Math.round((realizado / metaValor) * 100) : 0);
+      const batida  = realizado >= metaValor;
+      const classe  = batida ? 'batida' : 'nao-batida';
+      const fillCls = batida ? 'ok' : 'parcial';
+      const avatarHTML = s.vendedor.foto
+        ? `<div class="avatar" style="width:26px;height:26px;font-size:9px"><img src="${s.vendedor.foto}" alt=""></div>`
+        : `<div class="avatar" style="width:26px;height:26px;font-size:9px">${Utils.iniciais(s.vendedor.nome + ' ' + s.vendedor.sobrenome)}</div>`;
+
+      return `
+        <div class="meta-row ${classe}">
+          ${avatarHTML}
+          <div class="meta-info">
+            <div class="meta-nome">${s.vendedor.nome} ${s.vendedor.sobrenome}</div>
+            <div class="meta-progresso-track">
+              <div class="meta-progresso-fill ${fillCls}" style="width:${pct}%"></div>
+            </div>
+          </div>
+          <div class="meta-contagem">${realizado}/${metaValor}</div>
+          ${batida ? '<span class="meta-check">✅</span>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    if (rodape) {
+      rodape.textContent = `Time realizou ${totalRealizado} de ${totalMeta} ${label}`;
+    }
+  },
+};
+
+/* ====================================================================
+   APP — inicialização e ciclo de atualização
+==================================================================== */
+const App = {
+  INTERVALO_MS: 60000, // auto-refresh a cada 60 segundos
+  _timer: null,
+
+  init() {
+    this.refresh();
+    this._timer = setInterval(() => this.refresh(), this.INTERVALO_MS);
+    // Atualiza imediatamente quando o Admin salva algo em outra aba/janela
+    window.addEventListener('storage', e => {
+      if (e.key && e.key.startsWith('lux_')) this.refresh();
+    });
+    console.log('[Lux Dashboard] Iniciado. Auto-refresh a cada 60s + storage listener ativo.');
+  },
+
+  refresh() {
+    try { Renderers.q1(); } catch(e) { console.error('Q1:', e); }
+    try { Renderers.q2(); } catch(e) { console.error('Q2:', e); }
+    try { Renderers.q3(); } catch(e) { console.error('Q3:', e); }
+    try { Renderers.q4(); } catch(e) { console.error('Q4:', e); }
+  },
+};
+
+/* ====================================================================
+   DADOS FICTÍCIOS — seed automático na primeira abertura
+   Remove qualquer uma das chaves abaixo no localStorage para resetar.
+==================================================================== */
+const DemoData = {
+  /** Migração: atualiza perfil da Luana para 'Ambos' se ainda estiver como 'Executivo' */
+  migrate() {
+    const raw = localStorage.getItem('lux_equipe');
+    if (!raw) return;
+    const equipe = JSON.parse(raw);
+    let changed = false;
+    equipe.forEach(v => {
+      if (v.nome === 'Luana' && v.sobrenome === 'Furtado' && v.perfil !== 'Ambos') {
+        v.perfil = 'Ambos';
+        changed = true;
+      }
+    });
+    if (changed) localStorage.setItem('lux_equipe', JSON.stringify(equipe));
+  },
+
+  seed() {
+    /* Só popula se não houver equipe cadastrada */
+    if (localStorage.getItem('lux_equipe')) return;
+
+    /* ---------- EQUIPE ---------- */
+    const equipe = [
+      { id: 'edn1',  nome: 'Bianca',   sobrenome: 'Oliveira', perfil: 'EDN',       foto: null },
+      { id: 'edn2',  nome: 'Caio',     sobrenome: 'Dorneles', perfil: 'EDN',       foto: null },
+      { id: 'edn3',  nome: 'Giovanna', sobrenome: 'Bispo',    perfil: 'EDN',       foto: null },
+      { id: 'edn4',  nome: 'Jhonatas', sobrenome: 'Baldez',   perfil: 'EDN',       foto: null },
+      { id: 'edn5',  nome: 'Gabriel',  sobrenome: 'Veiga',    perfil: 'EDN',       foto: null },
+      { id: 'exec1', nome: 'Brenda',   sobrenome: 'Gino',     perfil: 'Executivo', foto: null },
+      { id: 'exec2', nome: 'Brunno',   sobrenome: 'Meneguette',perfil: 'Executivo',foto: null },
+      { id: 'exec3', nome: 'Luana',    sobrenome: 'Furtado',  perfil: 'Ambos',     foto: null },
+      { id: 'exec4', nome: 'Vanessa',  sobrenome: 'Moral',    perfil: 'Executivo', foto: null },
+      { id: 'exec5', nome: 'Gabriel',  sobrenome: 'Gracia',   perfil: 'Executivo', foto: null },
+    ];
+
+    /* ---------- EVENTOS ----------
+       Reunioes Jan-Abr 2026 com a equipe real                    */
+    const eventos = [
+      /* === JANEIRO 2026 === */
+      { id:'j1',  vendedorId:'edn1',  data:'2026-01-08', tipo:'reuniao_realizada' },
+      { id:'j2',  vendedorId:'edn2',  data:'2026-01-10', tipo:'reuniao_realizada' },
+      { id:'j3',  vendedorId:'edn2',  data:'2026-01-15', tipo:'reuniao_realizada' },
+      { id:'j4',  vendedorId:'edn3',  data:'2026-01-12', tipo:'reuniao_realizada' },
+      { id:'j5',  vendedorId:'edn4',  data:'2026-01-20', tipo:'reuniao_realizada' },
+      { id:'j6',  vendedorId:'edn5',  data:'2026-01-18', tipo:'reuniao_realizada' },
+      { id:'jf1', vendedorId:'exec1', data:'2026-01-17', tipo:'fechamento', nomeCliente:'Alpha Residencial', cidadeEstado:'Campinas / SP',      numUnidades:120, valorGestao:9800,  ednId:'edn2' },
+      { id:'jf2', vendedorId:'exec2', data:'2026-01-25', tipo:'fechamento', nomeCliente:'Vila dos Ipes',     cidadeEstado:'Ribeirao Preto / SP', numUnidades:88,  valorGestao:7200,  ednId:'edn1' },
+
+      /* === FEVEREIRO 2026 === */
+      { id:'f1',  vendedorId:'edn1',  data:'2026-02-04', tipo:'reuniao_realizada' },
+      { id:'f2',  vendedorId:'edn1',  data:'2026-02-11', tipo:'reuniao_realizada' },
+      { id:'f3',  vendedorId:'edn1',  data:'2026-02-18', tipo:'reuniao_realizada' },
+      { id:'f4',  vendedorId:'edn2',  data:'2026-02-06', tipo:'reuniao_realizada' },
+      { id:'f5',  vendedorId:'edn2',  data:'2026-02-13', tipo:'reuniao_realizada' },
+      { id:'f6',  vendedorId:'edn3',  data:'2026-02-10', tipo:'reuniao_realizada' },
+      { id:'f7',  vendedorId:'edn3',  data:'2026-02-24', tipo:'reuniao_realizada' },
+      { id:'f8',  vendedorId:'edn4',  data:'2026-02-14', tipo:'reuniao_realizada' },
+      { id:'f9',  vendedorId:'edn5',  data:'2026-02-08', tipo:'reuniao_realizada' },
+      { id:'f10', vendedorId:'edn5',  data:'2026-02-20', tipo:'reuniao_realizada' },
+      { id:'ff1', vendedorId:'exec1', data:'2026-02-12', tipo:'fechamento', nomeCliente:'Brisa do Vale',    cidadeEstado:'Belo Horizonte / MG', numUnidades:204, valorGestao:16400, ednId:'edn1' },
+      { id:'ff2', vendedorId:'exec3', data:'2026-02-18', tipo:'fechamento', nomeCliente:'Terras do Sol',    cidadeEstado:'Goiania / GO',        numUnidades:156, valorGestao:12800, ednId:null   },
+      { id:'ff3', vendedorId:'exec4', data:'2026-02-28', tipo:'fechamento', nomeCliente:'Park Residence',   cidadeEstado:'Curitiba / PR',       numUnidades:72,  valorGestao:6400,  ednId:'edn3' },
+
+      /* === MARCO 2026 === */
+      { id:'m1',  vendedorId:'edn1',  data:'2026-03-05', tipo:'reuniao_realizada' },
+      { id:'m2',  vendedorId:'edn1',  data:'2026-03-12', tipo:'reuniao_realizada' },
+      { id:'m3',  vendedorId:'edn1',  data:'2026-03-20', tipo:'reuniao_realizada' },
+      { id:'m4',  vendedorId:'edn1',  data:'2026-03-27', tipo:'reuniao_realizada' },
+      { id:'m5',  vendedorId:'edn2',  data:'2026-03-03', tipo:'reuniao_realizada' },
+      { id:'m6',  vendedorId:'edn2',  data:'2026-03-07', tipo:'reuniao_realizada' },
+      { id:'m7',  vendedorId:'edn2',  data:'2026-03-11', tipo:'reuniao_realizada' },
+      { id:'m8',  vendedorId:'edn2',  data:'2026-03-19', tipo:'reuniao_realizada' },
+      { id:'m9',  vendedorId:'edn3',  data:'2026-03-08', tipo:'reuniao_realizada' },
+      { id:'m10', vendedorId:'edn3',  data:'2026-03-17', tipo:'reuniao_realizada' },
+      { id:'m11', vendedorId:'edn3',  data:'2026-03-25', tipo:'reuniao_realizada' },
+      { id:'m12', vendedorId:'edn4',  data:'2026-03-10', tipo:'reuniao_realizada' },
+      { id:'m13', vendedorId:'edn4',  data:'2026-03-22', tipo:'reuniao_realizada' },
+      { id:'m14', vendedorId:'edn5',  data:'2026-03-06', tipo:'reuniao_realizada' },
+      { id:'m15', vendedorId:'edn5',  data:'2026-03-15', tipo:'reuniao_realizada' },
+      { id:'m16', vendedorId:'edn5',  data:'2026-03-24', tipo:'reuniao_realizada' },
+      { id:'mf1', vendedorId:'exec2', data:'2026-03-06', tipo:'fechamento', nomeCliente:'Gran Vista',       cidadeEstado:'Florianopolis / SC',  numUnidades:180, valorGestao:18600, ednId:'edn2' },
+      { id:'mf2', vendedorId:'exec1', data:'2026-03-13', tipo:'fechamento', nomeCliente:'Espaco Vivo',      cidadeEstado:'Sao Paulo / SP',      numUnidades:140, valorGestao:14200, ednId:'edn1' },
+      { id:'mf3', vendedorId:'exec1', data:'2026-03-21', tipo:'fechamento', nomeCliente:'Cond. Horizonte',  cidadeEstado:'Porto Alegre / RS',   numUnidades:220, valorGestao:22000, ednId:'edn4' },
+      { id:'mf4', vendedorId:'exec3', data:'2026-03-10', tipo:'fechamento', nomeCliente:'Blue Sky',         cidadeEstado:'Recife / PE',         numUnidades:168, valorGestao:15800, ednId:'edn3' },
+      { id:'mf5', vendedorId:'exec4', data:'2026-03-25', tipo:'fechamento', nomeCliente:'Viver Mais',       cidadeEstado:'Fortaleza / CE',      numUnidades:104, valorGestao:9200,  ednId:null   },
+      { id:'mf6', vendedorId:'exec5', data:'2026-03-18', tipo:'fechamento', nomeCliente:'Alto da Serra',    cidadeEstado:'Curitiba / PR',       numUnidades:88,  valorGestao:7600,  ednId:'edn5' },
+
+      /* === ABRIL 2026 — mes corrente === */
+      { id:'a1',  vendedorId:'edn1',  data:'2026-04-03', tipo:'reuniao_realizada' },
+      { id:'a2',  vendedorId:'edn1',  data:'2026-04-05', tipo:'reuniao_realizada' },
+      { id:'a3',  vendedorId:'edn1',  data:'2026-04-07', tipo:'reuniao_realizada' },
+      { id:'a4',  vendedorId:'edn1',  data:'2026-04-09', tipo:'reuniao_realizada' },
+      { id:'a5',  vendedorId:'edn1',  data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'a6',  vendedorId:'edn1',  data:'2026-04-12', tipo:'reuniao_realizada' },
+      { id:'a7',  vendedorId:'edn1',  data:'2026-04-14', tipo:'reuniao_realizada' },
+      { id:'a8',  vendedorId:'edn2',  data:'2026-04-02', tipo:'reuniao_realizada' },
+      { id:'a9',  vendedorId:'edn2',  data:'2026-04-04', tipo:'reuniao_realizada' },
+      { id:'a10', vendedorId:'edn2',  data:'2026-04-07', tipo:'reuniao_realizada' },
+      { id:'a11', vendedorId:'edn2',  data:'2026-04-10', tipo:'reuniao_realizada' },
+      { id:'a12', vendedorId:'edn2',  data:'2026-04-13', tipo:'reuniao_realizada' },
+      { id:'a13', vendedorId:'edn3',  data:'2026-04-03', tipo:'reuniao_realizada' },
+      { id:'a14', vendedorId:'edn3',  data:'2026-04-08', tipo:'reuniao_realizada' },
+      { id:'a15', vendedorId:'edn3',  data:'2026-04-12', tipo:'reuniao_realizada' },
+      { id:'a16', vendedorId:'edn4',  data:'2026-04-06', tipo:'reuniao_realizada' },
+      { id:'a17', vendedorId:'edn4',  data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'a18', vendedorId:'edn5',  data:'2026-04-04', tipo:'reuniao_realizada' },
+      { id:'a19', vendedorId:'edn5',  data:'2026-04-09', tipo:'reuniao_realizada' },
+      { id:'a20', vendedorId:'edn5',  data:'2026-04-14', tipo:'reuniao_realizada' },
+      /* Fechamentos de abril — cards Q2 */
+      { id:'af1', vendedorId:'exec1', data:'2026-04-04', tipo:'fechamento', nomeCliente:'BTG Lag Campinas', cidadeEstado:'Campinas / SP',      numUnidades:280, valorGestao:24800, ednId:'edn1' },
+      { id:'af2', vendedorId:'exec2', data:'2026-04-08', tipo:'fechamento', nomeCliente:'Porto Brasilia',   cidadeEstado:'Brasilia / DF',      numUnidades:210, valorGestao:19600, ednId:null   },
+      { id:'af3', vendedorId:'exec3', data:'2026-04-12', tipo:'fechamento', nomeCliente:'Cond. Sao Luiz',   cidadeEstado:'Sao Paulo / SP',     numUnidades:96,  valorGestao:11400, ednId:'edn3' },
+    ];
+
+    /* ---------- METAS ---------- */
+    const metas = { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 };
+
+    /* ---------- DESTAQUES MÊS ANTERIOR (Março 2026) ---------- */
+    const destaques = {
+      mes: 'Março 2026',
+      reunioes:    { nome: 'Bianca Oliveira',   valor: 8  },
+      fechamentos: { nome: 'Brenda Gino',       valor: 2  },
+      receita:     { nome: 'Brunno Meneguette', valor: 18600 },
+    };
+
+    /* ---------- HISTÓRICO 2025 ---------- */
+    const historico2025 = {
+      reunioes:    [7, 9, 11, 8, 10, 13, 9, 8, 11, 12, 10, 8],
+      fechamentos: [2, 2,  3, 2,  3,  4, 3, 2,  3,  4,  3, 2],
+    };
+
+    /* ---------- PERSISTE ---------- */
+    localStorage.setItem('lux_equipe',             JSON.stringify(equipe));
+    localStorage.setItem('lux_eventos',            JSON.stringify(eventos));
+    localStorage.setItem('lux_metas',              JSON.stringify(metas));
+    localStorage.setItem('lux_destaques_anterior', JSON.stringify(destaques));
+    localStorage.setItem('lux_historico_2025',     JSON.stringify(historico2025));
+
+    console.log('[Lux Dashboard] Dados fictícios carregados. Use o admin.html para gerenciar.');
+  },
+};
+
+/* Inicializa quando a página carregar */
+document.addEventListener('DOMContentLoaded', () => {
+  DemoData.migrate(); // migrações de esquema (idempotente)
+  DemoData.seed();    // popula dados na primeira abertura
+  App.init();
+});
+</script>
+</body>
+</html>
