@@ -587,11 +587,13 @@
     .meta-row {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      padding: 7px 10px;
-      border-radius: 10px;
+      padding: 12px 16px;
+      border-radius: 12px;
       flex-shrink: 0;
       transition: all 0.4s ease;
+      min-height: 60px;
     }
 
     .meta-row.batida {
@@ -602,6 +604,13 @@
     .meta-row.nao-batida {
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
+    }
+
+    .meta-valor-grande {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--verde-3);
+      text-align: center;
     }
 
     .meta-info { flex: 1; min-width: 0; }
@@ -1443,25 +1452,12 @@ const Renderers = {
     container.innerHTML = stats.map(s => {
       const realizado = metricFn(s);
       totalRealizado += realizado;
-      const pct     = Math.min(100, metaValor > 0 ? Math.round((realizado / metaValor) * 100) : 0);
       const batida  = realizado >= metaValor;
       const classe  = batida ? 'batida' : 'nao-batida';
-      const fillCls = batida ? 'ok' : 'parcial';
-      const avatarHTML = s.vendedor.foto
-        ? `<div class="avatar" style="width:26px;height:26px;font-size:9px"><img src="${s.vendedor.foto}" alt=""></div>`
-        : `<div class="avatar" style="width:26px;height:26px;font-size:9px">${Utils.iniciais(s.vendedor.nome + ' ' + s.vendedor.sobrenome)}</div>`;
 
       return `
         <div class="meta-row ${classe}">
-          ${avatarHTML}
-          <div class="meta-info">
-            <div class="meta-nome">${s.vendedor.nome} ${s.vendedor.sobrenome}</div>
-            <div class="meta-progresso-track">
-              <div class="meta-progresso-fill ${fillCls}" style="width:${pct}%"></div>
-            </div>
-          </div>
-          <div class="meta-contagem">${realizado}/${metaValor}</div>
-          ${batida ? '<span class="meta-check">✅</span>' : ''}
+          <div class="meta-valor-grande">${realizado}</div>
         </div>
       `;
     }).join('');
