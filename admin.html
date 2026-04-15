@@ -430,6 +430,43 @@
     .evento-data { color: var(--text-muted); font-size: 11px; margin-left: auto; }
 
     /* ================================================================
+       FILTROS DE EVENTOS + AGRUPAMENTO POR DIA
+    ================================================================ */
+    .filtros-eventos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      margin-bottom: 14px;
+      padding: 12px;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .eventos-dia-grupo { margin-bottom: 14px; }
+
+    .eventos-dia-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 4px 0 6px 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+
+    /* ================================================================
+       DESTAQUES AUTO-CALC
+    ================================================================ */
+    .dest-preview-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 10px 0 4px;
+    }
+
+    /* ================================================================
        FAIXAS DE BÔNUS
     ================================================================ */
     .faixa-row {
@@ -732,9 +769,40 @@
           </div>
         </div>
 
-        <!-- Log de eventos recentes -->
+        <!-- Histórico completo com filtros -->
         <div class="card">
-          <div class="card-titulo">Eventos Registrados (últimos 20)</div>
+          <div class="card-titulo">Histórico de Eventos</div>
+          <div class="filtros-eventos">
+            <div class="form-group" style="margin:0; flex:1; min-width:130px;">
+              <label>Data inicial</label>
+              <input type="date" id="filtro-data-ini">
+            </div>
+            <div class="form-group" style="margin:0; flex:1; min-width:130px;">
+              <label>Data final</label>
+              <input type="date" id="filtro-data-fim">
+            </div>
+            <div class="form-group" style="margin:0; flex:1.5; min-width:160px;">
+              <label>Pessoa</label>
+              <select id="filtro-pessoa">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0; flex:1.5; min-width:160px;">
+              <label>Tipo de evento</label>
+              <select id="filtro-tipo">
+                <option value="">Todos</option>
+                <option value="prospeccao">Prospecção</option>
+                <option value="reuniao_agendada">Reunião Agendada</option>
+                <option value="reuniao_realizada">Reunião Realizada</option>
+                <option value="fechamento">Fechamento</option>
+              </select>
+            </div>
+            <div style="display:flex; gap:6px; align-items:flex-end; padding-bottom:2px;">
+              <button class="btn btn-primary btn-sm" onclick="Admin.filtrarEventos()">Filtrar</button>
+              <button class="btn btn-ghost  btn-sm" onclick="Admin.limparFiltros()">Limpar</button>
+            </div>
+          </div>
+          <div id="eventos-total" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;"></div>
           <div id="lista-eventos-recentes"></div>
         </div>
       </section>
@@ -744,55 +812,72 @@
       ============================================================ -->
       <section class="secao" id="sec-destaques">
         <div class="secao-titulo">Destaques do Mês Anterior</div>
-        <div class="secao-desc">Define os 3 vencedores do mês anterior para exibição no Q3 do telão. Atualizar manualmente no início de cada mês.</div>
+        <div class="secao-desc">Selecione o mês e clique em <b>Calcular</b> — o sistema busca automaticamente quem mais reuniu, mais fechou e gerou mais receita. Depois publique no telão com um clique.</div>
 
         <div class="card">
-          <div class="form-group" style="margin-bottom:20px; max-width:300px;">
-            <label>Mês de Referência</label>
-            <input type="text" id="dest-mes" placeholder="Ex: Março 2026">
+          <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:20px;">
+            <div class="form-group" style="margin:0; flex:1; min-width:200px;">
+              <label>Mês de Referência</label>
+              <input type="month" id="dest-mes-input">
+            </div>
+            <button class="btn btn-primary" onclick="Admin.calcularDestaquesMes(document.getElementById('dest-mes-input').value)">🔄 Calcular Automaticamente</button>
           </div>
 
-          <div class="destaque-form-grid">
-            <!-- Reuniões -->
-            <div class="destaque-form-card">
-              <h4>🤝 Mais Reuniões — EDN</h4>
-              <div class="form-group" style="margin-bottom:10px;">
-                <label>Nome completo</label>
-                <input type="text" id="dest-reun-nome" placeholder="Nome do EDN">
+          <!-- Pré-visualização (inicialmente oculta) -->
+          <div id="dest-preview" style="display:none;">
+            <div class="dest-preview-hint">Pré-visualização calculada a partir dos eventos registrados:</div>
+            <div class="destaque-form-grid" style="margin-top:14px;">
+              <!-- Reuniões -->
+              <div class="destaque-form-card">
+                <h4>🤝 Mais Reuniões — EDN</h4>
+                <div class="form-group" style="margin-bottom:10px;">
+                  <label>Nome</label>
+                  <input type="text" id="dest-reun-nome" readonly style="background:var(--bg); opacity:0.8;">
+                </div>
+                <div class="form-group">
+                  <label>Nº de Reuniões</label>
+                  <input type="number" id="dest-reun-valor" readonly style="background:var(--bg); opacity:0.8;" min="0">
+                </div>
               </div>
-              <div class="form-group">
-                <label>Nº de Reuniões</label>
-                <input type="number" id="dest-reun-valor" placeholder="0" min="0">
+              <!-- Fechamentos -->
+              <div class="destaque-form-card">
+                <h4>🏆 Mais Fechamentos — Exec.</h4>
+                <div class="form-group" style="margin-bottom:10px;">
+                  <label>Nome</label>
+                  <input type="text" id="dest-fech-nome" readonly style="background:var(--bg); opacity:0.8;">
+                </div>
+                <div class="form-group">
+                  <label>Nº de Fechamentos</label>
+                  <input type="number" id="dest-fech-valor" readonly style="background:var(--bg); opacity:0.8;" min="0">
+                </div>
+              </div>
+              <!-- Receita -->
+              <div class="destaque-form-card">
+                <h4>💰 Maior Receita — Exec.</h4>
+                <div class="form-group" style="margin-bottom:10px;">
+                  <label>Nome</label>
+                  <input type="text" id="dest-rec-nome" readonly style="background:var(--bg); opacity:0.8;">
+                </div>
+                <div class="form-group">
+                  <label>Receita (R$)</label>
+                  <input type="number" id="dest-rec-valor" readonly style="background:var(--bg); opacity:0.8;" min="0">
+                </div>
               </div>
             </div>
-            <!-- Fechamentos -->
-            <div class="destaque-form-card">
-              <h4>🏆 Mais Fechamentos — Exec.</h4>
-              <div class="form-group" style="margin-bottom:10px;">
-                <label>Nome completo</label>
-                <input type="text" id="dest-fech-nome" placeholder="Nome do Executivo">
-              </div>
-              <div class="form-group">
-                <label>Nº de Fechamentos</label>
-                <input type="number" id="dest-fech-valor" placeholder="0" min="0">
-              </div>
-            </div>
-            <!-- Receita -->
-            <div class="destaque-form-card">
-              <h4>💰 Maior Receita — Exec.</h4>
-              <div class="form-group" style="margin-bottom:10px;">
-                <label>Nome completo</label>
-                <input type="text" id="dest-rec-nome" placeholder="Nome do Executivo">
-              </div>
-              <div class="form-group">
-                <label>Receita (R$)</label>
-                <input type="number" id="dest-rec-valor" placeholder="0" min="0">
-              </div>
+            <div class="form-actions">
+              <button class="btn btn-success" onclick="Admin.salvarDestaques()">✓ Publicar no Telão</button>
             </div>
           </div>
 
-          <div class="form-actions">
-            <button class="btn btn-success" onclick="Admin.salvarDestaques()">✓ Salvar Destaques</button>
+          <!-- Placeholder quando nada calculado ainda -->
+          <div id="dest-vazio" style="font-size:12px; color:var(--text-muted); padding:8px 0 4px;">
+            Selecione um mês acima e clique em <b>Calcular Automaticamente</b>.
+          </div>
+
+          <!-- Destaques atualmente publicados no telão -->
+          <div id="dest-publicado" style="margin-top:18px; display:none;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;">Atualmente no Telão</div>
+            <div id="dest-publicado-info" style="font-size:12px; color:var(--text-muted);"></div>
           </div>
         </div>
       </section>
@@ -1426,31 +1511,107 @@ const Admin = {
     document.getElementById('fech-edn').value = '';
   },
 
+  /* Filtros ativos (aplicados ao histórico de eventos) */
+  _filtros: { dataIni: '', dataFim: '', pessoa: '', tipo: '' },
+
+  /* Popular select de pessoa no filtro de eventos */
+  _popularFiltroPessoa() {
+    const sel = document.getElementById('filtro-pessoa');
+    if (!sel) return;
+    const vendedores = DataService.getVendedores();
+    const atualVal   = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>' +
+      vendedores.map(v => `<option value="${v.id}">${v.nome} ${v.sobrenome}</option>`).join('');
+    sel.value = atualVal;
+  },
+
+  filtrarEventos() {
+    this._filtros = {
+      dataIni: document.getElementById('filtro-data-ini').value || '',
+      dataFim: document.getElementById('filtro-data-fim').value || '',
+      pessoa:  document.getElementById('filtro-pessoa').value  || '',
+      tipo:    document.getElementById('filtro-tipo').value    || '',
+    };
+    this._renderEventos();
+  },
+
+  limparFiltros() {
+    this._filtros = { dataIni: '', dataFim: '', pessoa: '', tipo: '' };
+    document.getElementById('filtro-data-ini').value = '';
+    document.getElementById('filtro-data-fim').value = '';
+    document.getElementById('filtro-pessoa').value   = '';
+    document.getElementById('filtro-tipo').value     = '';
+    this._renderEventos();
+  },
+
   carregar_eventos() {
-    const eventos    = DataService.getEventos().slice().reverse().slice(0, 20);
+    this._popularFiltroPessoa();
+    this._renderEventos();
+  },
+
+  _renderEventos() {
     const vendedores = DataService.getVendedores();
     const findVend   = id => vendedores.find(v => v.id === id);
-    const el = document.getElementById('lista-eventos-recentes');
+    const el         = document.getElementById('lista-eventos-recentes');
+    const totalEl    = document.getElementById('eventos-total');
+    const f          = this._filtros;
+
+    /* 1. Obter todos os eventos em ordem decrescente */
+    let eventos = DataService.getEventos().slice().sort((a, b) =>
+      (b.data || '').localeCompare(a.data || ''));
+
+    /* 2. Aplicar filtros */
+    if (f.dataIni) eventos = eventos.filter(e => (e.data || '') >= f.dataIni);
+    if (f.dataFim) eventos = eventos.filter(e => (e.data || '') <= f.dataFim);
+    if (f.pessoa)  eventos = eventos.filter(e => e.vendedorId === f.pessoa);
+    if (f.tipo)    eventos = eventos.filter(e => e.tipo === f.tipo);
+
+    /* 3. Atualizar contador */
+    const total = DataService.getEventos().length;
+    totalEl.textContent = eventos.length === total
+      ? `${total} evento${total !== 1 ? 's' : ''} no total`
+      : `${eventos.length} de ${total} evento${total !== 1 ? 's' : ''} (filtrado)`;
 
     if (!eventos.length) {
-      el.innerHTML = '<div class="lista-vazia">Nenhum evento registrado.</div>';
+      el.innerHTML = '<div class="lista-vazia">Nenhum evento encontrado.</div>';
       return;
     }
 
-    el.innerHTML = eventos.map(e => {
-      const v = findVend(e.vendedorId);
-      const nome = v ? `${v.nome} ${v.sobrenome}` : '(removido)';
-      const label = Utils.TIPOS_LABEL[e.tipo] || e.tipo;
-      const extra = e.tipo === 'fechamento'
-        ? ` — ${e.nomeCliente || ''}${e.valorGestao ? ' · ' + Utils.formataMoeda(e.valorGestao) : ''}`
-        : '';
+    /* 4. Agrupar por data */
+    const grupos = {};
+    eventos.forEach(e => {
+      const dia = e.data || '(sem data)';
+      if (!grupos[dia]) grupos[dia] = [];
+      grupos[dia].push(e);
+    });
 
+    /* 5. Renderizar grupos */
+    const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const formataDia = str => {
+      if (!str || str === '(sem data)') return '(sem data)';
+      const [y, m, d] = str.split('-');
+      return `${d} ${MESES[parseInt(m,10)-1]} ${y}`;
+    };
+
+    el.innerHTML = Object.keys(grupos).map(dia => {
+      const itens = grupos[dia].map(e => {
+        const v     = findVend(e.vendedorId);
+        const nome  = v ? `${v.nome} ${v.sobrenome}` : '(removido)';
+        const label = Utils.TIPOS_LABEL[e.tipo] || e.tipo;
+        const extra = e.tipo === 'fechamento'
+          ? ` — ${e.nomeCliente || ''}${e.valorGestao ? ' · ' + Utils.formataMoeda(e.valorGestao) : ''}`
+          : '';
+        return `
+          <div class="evento-item">
+            <span class="evento-tipo tipo-${e.tipo}">${label}</span>
+            <div class="evento-info">${nome}${extra}</div>
+            <button class="btn btn-danger btn-sm" style="margin-left:auto;" onclick="Admin.removerEvento('${e.id}')">✕</button>
+          </div>`;
+      }).join('');
       return `
-        <div class="evento-item">
-          <span class="evento-tipo tipo-${e.tipo}">${label}</span>
-          <div class="evento-info">${nome}${extra}</div>
-          <span class="evento-data">${e.data || ''}</span>
-          <button class="btn btn-danger btn-sm" onclick="Admin.removerEvento('${e.id}')">✕</button>
+        <div class="eventos-dia-grupo">
+          <div class="eventos-dia-header">${formataDia(dia)}</div>
+          ${itens}
         </div>`;
     }).join('');
   },
@@ -1464,29 +1625,108 @@ const Admin = {
   },
 
   /* ------------------------------------------------------------------
-     DESTAQUES DO MÊS ANTERIOR
+     DESTAQUES DO MÊS ANTERIOR — auto-cálculo
   ------------------------------------------------------------------ */
+
+  /* Converte "YYYY-MM" → "Mês YYYY" em português */
+  _mesLabel(ymStr) {
+    if (!ymStr) return '';
+    const MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                        'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const [y, m] = ymStr.split('-');
+    return `${MESES_FULL[parseInt(m,10)-1]} ${y}`;
+  },
+
+  calcularDestaquesMes(mesYM) {
+    if (!mesYM) { this.toast('Selecione o mês antes de calcular.'); return; }
+
+    const vendedores = DataService.getVendedores();
+    const findVend   = id => vendedores.find(v => v.id === id);
+
+    /* Filtrar eventos do mês */
+    const eventos = DataService.getEventos().filter(e => (e.data || '').startsWith(mesYM));
+
+    /* ---------- Reuniões realizadas (EDN / Ambos) ---------- */
+    const contReun = {};
+    eventos.filter(e => e.tipo === 'reuniao_realizada').forEach(e => {
+      const v = findVend(e.vendedorId);
+      if (!v || (v.perfil !== 'EDN' && v.perfil !== 'Ambos')) return;
+      contReun[e.vendedorId] = (contReun[e.vendedorId] || 0) + 1;
+    });
+    const topReunId  = Object.entries(contReun).sort((a,b)=>b[1]-a[1])[0];
+    const topReunV   = topReunId ? findVend(topReunId[0]) : null;
+    const topReunNome = topReunV ? `${topReunV.nome} ${topReunV.sobrenome}` : '(nenhum)';
+    const topReunVal  = topReunId ? topReunId[1] : 0;
+
+    /* ---------- Fechamentos (Executivo / Ambos) ---------- */
+    const contFech = {};
+    eventos.filter(e => e.tipo === 'fechamento').forEach(e => {
+      const v = findVend(e.vendedorId);
+      if (!v || (v.perfil !== 'Executivo' && v.perfil !== 'Ambos')) return;
+      contFech[e.vendedorId] = (contFech[e.vendedorId] || 0) + 1;
+    });
+    const topFechId   = Object.entries(contFech).sort((a,b)=>b[1]-a[1])[0];
+    const topFechV    = topFechId ? findVend(topFechId[0]) : null;
+    const topFechNome = topFechV ? `${topFechV.nome} ${topFechV.sobrenome}` : '(nenhum)';
+    const topFechVal  = topFechId ? topFechId[1] : 0;
+
+    /* ---------- Receita (Executivo / Ambos) ---------- */
+    const somaRec = {};
+    eventos.filter(e => e.tipo === 'fechamento').forEach(e => {
+      const v = findVend(e.vendedorId);
+      if (!v || (v.perfil !== 'Executivo' && v.perfil !== 'Ambos')) return;
+      somaRec[e.vendedorId] = (somaRec[e.vendedorId] || 0) + (e.valorGestao || 0);
+    });
+    const topRecId   = Object.entries(somaRec).sort((a,b)=>b[1]-a[1])[0];
+    const topRecV    = topRecId ? findVend(topRecId[0]) : null;
+    const topRecNome = topRecV ? `${topRecV.nome} ${topRecV.sobrenome}` : '(nenhum)';
+    const topRecVal  = topRecId ? topRecId[1] : 0;
+
+    /* ---------- Popular pré-visualização ---------- */
+    document.getElementById('dest-reun-nome').value  = topReunNome;
+    document.getElementById('dest-reun-valor').value = topReunVal;
+    document.getElementById('dest-fech-nome').value  = topFechNome;
+    document.getElementById('dest-fech-valor').value = topFechVal;
+    document.getElementById('dest-rec-nome').value   = topRecNome;
+    document.getElementById('dest-rec-valor').value  = topRecVal;
+
+    document.getElementById('dest-preview').style.display = 'block';
+    document.getElementById('dest-vazio').style.display   = 'none';
+
+    const total = eventos.length;
+    this.toast(`✓ Calculado! ${total} evento${total!==1?'s':''} em ${this._mesLabel(mesYM)}.`);
+  },
+
   carregar_destaques() {
     const d = DataService.getDestaquesAnterior();
-    document.getElementById('dest-mes').value = d.mes || '';
 
-    if (d.reunioes) {
-      document.getElementById('dest-reun-nome').value  = d.reunioes.nome  || '';
-      document.getElementById('dest-reun-valor').value = d.reunioes.valor || '';
+    /* Mostrar destaques publicados atualmente (rodapé do card) */
+    const pubEl   = document.getElementById('dest-publicado');
+    const pubInfo = document.getElementById('dest-publicado-info');
+    if (d && d.mes) {
+      pubEl.style.display = 'block';
+      const r = d.reunioes   ? `🤝 ${d.reunioes.nome} (${d.reunioes.valor})` : '—';
+      const f = d.fechamentos ? `🏆 ${d.fechamentos.nome} (${d.fechamentos.valor})` : '—';
+      const v = d.receita     ? `💰 ${d.receita.nome} (${Utils.formataMoeda(d.receita.valor)})` : '—';
+      pubInfo.innerHTML = `<b>${d.mes}</b><br>${r} &nbsp;·&nbsp; ${f} &nbsp;·&nbsp; ${v}`;
+    } else {
+      pubEl.style.display = 'none';
     }
-    if (d.fechamentos) {
-      document.getElementById('dest-fech-nome').value  = d.fechamentos.nome  || '';
-      document.getElementById('dest-fech-valor').value = d.fechamentos.valor || '';
-    }
-    if (d.receita) {
-      document.getElementById('dest-rec-nome').value  = d.receita.nome  || '';
-      document.getElementById('dest-rec-valor').value = d.receita.valor || '';
-    }
+
+    /* Pré-selecionar mês anterior no picker */
+    const hoje  = new Date();
+    const ant   = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    const ym    = `${ant.getFullYear()}-${String(ant.getMonth()+1).padStart(2,'0')}`;
+    const picker = document.getElementById('dest-mes-input');
+    if (picker && !picker.value) picker.value = ym;
   },
 
   salvarDestaques() {
+    const mesYM  = document.getElementById('dest-mes-input').value;
+    if (!mesYM) { this.toast('Selecione o mês antes de publicar.'); return; }
+
     const obj = {
-      mes: document.getElementById('dest-mes').value.trim(),
+      mes: this._mesLabel(mesYM),
       reunioes: {
         nome:  document.getElementById('dest-reun-nome').value.trim(),
         valor: parseInt(document.getElementById('dest-reun-valor').value) || 0,
@@ -1502,7 +1742,8 @@ const Admin = {
     };
     DataService.autoSnapshot();
     DataService.saveDestaquesAnterior(obj);
-    this.toast('Destaques salvos!');
+    this.carregar_destaques();
+    this.toast('✓ Destaques publicados no telão!');
   },
 
   /* ------------------------------------------------------------------
