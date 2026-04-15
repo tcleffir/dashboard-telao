@@ -883,6 +883,40 @@
       </section>
 
       <!-- ============================================================
+           SEÇÃO: ÚLTIMOS FECHAMENTOS DO MÊS
+      ============================================================ -->
+      <section class="secao" id="sec-ultimos-fechamentos">
+        <div class="secao-titulo">Últimos Fechamentos do Mês</div>
+        <div class="secao-desc">Adicione os últimos fechamentos para exibição no Q3 do telão. Aparecem em ordem reversa (mais recentes primeiro).</div>
+
+        <div class="card">
+          <div style="margin-bottom:16px; padding:12px; background:var(--bg); border-radius:8px; border:1px solid var(--border);">
+            <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:12px;">➕ Adicionar Novo Fechamento</div>
+            <div class="form-group">
+              <label>Cliente</label>
+              <input type="text" id="uf-cliente" placeholder="Nome do cliente">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div class="form-group">
+                <label>Executivo</label>
+                <input type="text" id="uf-executivo" placeholder="Nome do executivo">
+              </div>
+              <div class="form-group">
+                <label>Valor (R$)</label>
+                <input type="number" id="uf-valor" placeholder="0" min="0">
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:10px;">
+              <button class="btn btn-success btn-sm" onclick="Admin.adicionarUltimoFechamento()">✓ Adicionar</button>
+            </div>
+          </div>
+
+          <div class="card-titulo" style="margin-bottom:12px;">Fechamentos Registrados</div>
+          <div id="lista-ultimos-fechamentos" style="max-height:400px; overflow-y:auto;"></div>
+        </div>
+      </section>
+
+      <!-- ============================================================
            SEÇÃO: METAS DO MÊS
       ============================================================ -->
       <section class="secao" id="sec-metas">
@@ -1042,6 +1076,7 @@ const DataService = {
     eventos:            [],
     metas:              { reunioesPorEDN: 12, fechamentosPorExecutivo: 3 },
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
+    ultimos_fechamentos: [],
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
     historico_2026:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
@@ -1057,6 +1092,7 @@ const DataService = {
     if (r('lux_eventos'))            this._cache.eventos            = r('lux_eventos')            || [];
     if (r('lux_metas'))              this._cache.metas              = r('lux_metas')              || this._cache.metas;
     if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior') || this._cache.destaques_anterior;
+    if (r('lux_ultimos_fechamentos')) this._cache.ultimos_fechamentos = r('lux_ultimos_fechamentos') || [];
     if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita')      || [];
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025')     || this._cache.historico_2025;
     if (r('lux_historico_2026'))     this._cache.historico_2026     = r('lux_historico_2026')     || this._cache.historico_2026;
@@ -1068,6 +1104,7 @@ const DataService = {
     if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
     if (d.metas)                          this._cache.metas              = d.metas;
     if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
+    if (Array.isArray(d.ultimos_fechamentos)) this._cache.ultimos_fechamentos = d.ultimos_fechamentos;
     if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
     if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
     if (d.historico_2026)                 this._cache.historico_2026     = d.historico_2026;
@@ -1104,6 +1141,7 @@ const DataService = {
       eventos:            this._cache.eventos,
       metas:              this._cache.metas,
       destaques_anterior: this._cache.destaques_anterior,
+      ultimos_fechamentos: this._cache.ultimos_fechamentos,
       bonus_receita:      this._cache.bonus_receita,
       historico_2025:     this._cache.historico_2025,
       historico_2026:     this._cache.historico_2026,
@@ -1163,10 +1201,12 @@ const DataService = {
   getMetas()               { return this._cache.metas; },
   saveMetas(m)             { this._cache.metas = m;              this._write('metas', m); },
 
-  getDestaquesAnterior()   { return this._cache.destaques_anterior; },
-  saveDestaquesAnterior(d) { this._cache.destaques_anterior = d;  this._write('destaques_anterior', d); },
+  getDestaquesAnterior()    { return this._cache.destaques_anterior; },
+  saveDestaquesAnterior(d)  { this._cache.destaques_anterior = d;  this._write('destaques_anterior', d); },
+  getUltimosFechamentos()   { return this._cache.ultimos_fechamentos; },
+  saveUltimosFechamentos(f) { this._cache.ultimos_fechamentos = f;  this._write('ultimos_fechamentos', f); },
 
-  getBonusReceita()        { return this._cache.bonus_receita; },
+  getBonusReceita()         { return this._cache.bonus_receita; },
   saveBonusReceita(b)      { this._cache.bonus_receita = b;       this._write('bonus_receita', b); },
 
   getHistorico2025()       { return this._cache.historico_2025; },
@@ -1176,7 +1216,7 @@ const DataService = {
 
   exportData() {
     const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
-                  'lux_bonus_receita','lux_historico_2025','lux_historico_2026','lux_snapshots'];
+                  'lux_ultimos_fechamentos','lux_bonus_receita','lux_historico_2025','lux_historico_2026','lux_snapshots'];
     const obj = {};
     keys.forEach(k => { obj[k] = JSON.parse(localStorage.getItem(k) || 'null'); });
     return JSON.stringify(obj, null, 2);
@@ -1185,7 +1225,7 @@ const DataService = {
   importData(json) {
     const obj = JSON.parse(json);
     const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
-                  lux_destaques_anterior:'destaques_anterior',
+                  lux_destaques_anterior:'destaques_anterior', lux_ultimos_fechamentos:'ultimos_fechamentos',
                   lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025',
                   lux_historico_2026:'historico_2026' };
     Object.entries(map).forEach(([lsKey, cacheKey]) => {
@@ -1208,6 +1248,7 @@ const DataService = {
       data: {
         lux_equipe: this.getVendedores(), lux_eventos: this.getEventos(),
         lux_metas:  this.getMetas(),      lux_destaques_anterior: this.getDestaquesAnterior(),
+        lux_ultimos_fechamentos: this.getUltimosFechamentos(),
         lux_bonus_receita: this.getBonusReceita(), lux_historico_2025: this.getHistorico2025(),
         lux_historico_2026: this.getHistorico2026(),
       },
@@ -1219,7 +1260,7 @@ const DataService = {
     const snap = this._getSnapshots().find(s => s.id === id);
     if (!snap) return false;
     const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
-                  lux_destaques_anterior:'destaques_anterior',
+                  lux_destaques_anterior:'destaques_anterior', lux_ultimos_fechamentos:'ultimos_fechamentos',
                   lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025',
                   lux_historico_2026:'historico_2026' };
     Object.entries(map).forEach(([lsKey, cacheKey]) => {
@@ -1355,6 +1396,7 @@ const Admin = {
     this.carregar_destaques();
     this.carregar_metas();
     this.carregar_bonus();
+    this.renderUltimosFechamentos();
     this.carregar_historico();
     this.preencherSelectVendedores();
     this.configurarFotoPreview();
@@ -1792,6 +1834,77 @@ const Admin = {
       fechamentosPorExecutivo: parseInt(document.getElementById('meta-fechamentos').value) || 3,
     });
     this.toast('Metas salvas!');
+  },
+
+  /* ------------------------------------------------------------------
+     ÚLTIMOS FECHAMENTOS DO MÊS
+  ------------------------------------------------------------------ */
+  adicionarUltimoFechamento() {
+    const cliente   = document.getElementById('uf-cliente').value.trim();
+    const executivo = document.getElementById('uf-executivo').value.trim();
+    const valor     = parseFloat(document.getElementById('uf-valor').value) || 0;
+
+    if (!cliente || !executivo || valor <= 0) {
+      this.toast('⚠ Preencha cliente, executivo e valor > 0.');
+      return;
+    }
+
+    DataService.autoSnapshot();
+    const uf = DataService.getUltimosFechamentos();
+    uf.unshift({
+      id: Date.now(),
+      cliente,
+      executivo,
+      valor,
+      data: new Date().toLocaleDateString('pt-BR'),
+    });
+    DataService.saveUltimosFechamentos(uf);
+    this.renderUltimosFechamentos();
+
+    /* Limpar formulário */
+    document.getElementById('uf-cliente').value   = '';
+    document.getElementById('uf-executivo').value = '';
+    document.getElementById('uf-valor').value     = '';
+
+    this.toast('✓ Fechamento adicionado!');
+  },
+
+  renderUltimosFechamentos() {
+    const container = document.getElementById('lista-ultimos-fechamentos');
+    const uf = DataService.getUltimosFechamentos();
+
+    if (!uf.length) {
+      container.innerHTML = '<div class="lista-vazia">Nenhum fechamento registrado ainda.</div>';
+      return;
+    }
+
+    container.innerHTML = uf.map(f => `
+      <div class="faixa-row" style="align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-weight:600; color:var(--text);">${f.cliente}</div>
+          <div style="font-size:12px; color:var(--text-muted);">
+            ${f.executivo} · ${f.data || '—'}
+          </div>
+        </div>
+        <div style="font-weight:600; color:#2ecc71; min-width:80px; text-align:right;">
+          R$ ${Utils.formataMoeda(f.valor)}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="Admin._removerUltimoFechamento(${f.id})" style="margin-left:8px;">✕</button>
+      </div>
+    `).join('');
+  },
+
+  _removerUltimoFechamento(id) {
+    if (!confirm('Remover este fechamento?')) return;
+    DataService.autoSnapshot();
+    const uf = DataService.getUltimosFechamentos();
+    const idx = uf.findIndex(f => f.id === id);
+    if (idx >= 0) {
+      uf.splice(idx, 1);
+      DataService.saveUltimosFechamentos(uf);
+      this.renderUltimosFechamentos();
+      this.toast('Fechamento removido.');
+    }
   },
 
   /* ------------------------------------------------------------------

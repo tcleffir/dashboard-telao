@@ -801,6 +801,7 @@ const DataService = {
     eventos:            [],
     metas:              { reunioesPorEDN: 12, fechamentosPorExecutivo: 3 },
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
+    ultimos_fechamentos: [],
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
     historico_2026:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
@@ -824,6 +825,7 @@ const DataService = {
     if (r('lux_eventos'))            this._cache.eventos            = r('lux_eventos');
     if (r('lux_metas'))              this._cache.metas              = r('lux_metas');
     if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior');
+    if (r('lux_ultimos_fechamentos')) this._cache.ultimos_fechamentos = r('lux_ultimos_fechamentos');
     if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita');
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025');
     if (r('lux_historico_2026'))     this._cache.historico_2026     = r('lux_historico_2026');
@@ -835,6 +837,7 @@ const DataService = {
     if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
     if (d.metas)                          this._cache.metas              = d.metas;
     if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
+    if (Array.isArray(d.ultimos_fechamentos)) this._cache.ultimos_fechamentos = d.ultimos_fechamentos;
     if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
     if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
     if (d.historico_2026)                 this._cache.historico_2026     = d.historico_2026;
@@ -885,6 +888,7 @@ const DataService = {
   getFechamentos()       { return this._cache.eventos.filter(e => e.tipo === 'fechamento'); },
   getMetas()             { return this._cache.metas; },
   getDestaquesAnterior() { return this._cache.destaques_anterior; },
+  getUltimosFechamentos() { return this._cache.ultimos_fechamentos; },
   getBonusReceita()      { return this._cache.bonus_receita; },
   getHistorico2025()     { return this._cache.historico_2025; },
   getHistorico2026()     { return this._cache.historico_2026; },
@@ -1379,30 +1383,21 @@ const Renderers = {
     const fechContainer = document.getElementById('lista-fechamentos');
     if (!fechContainer) return;
 
-    const vendedores = DataService.getVendedores();
-    const findVend = id => vendedores.find(v => v.id === id);
-    const fechamentos = RankingEngine.ultimosFechamentosMes(3);
+    const ultimosFechamentos = DataService.getUltimosFechamentos() || [];
 
-    if (!fechamentos.length) {
-      fechContainer.innerHTML = '<div class="empty-state" style="width:100%"><div class="empty-icon">🤝</div>Nenhum fechamento este mês</div>';
+    if (!ultimosFechamentos.length) {
+      fechContainer.innerHTML = '<div class="empty-state" style="width:100%"><div class="empty-icon">🤝</div>Nenhum fechamento registrado este mês</div>';
       return;
     }
 
-    fechContainer.innerHTML = fechamentos.map(f => {
-      const exec    = findVend(f.vendedorId);
-      const edn     = f.ednId ? findVend(f.ednId) : null;
-      const execNome = exec ? `${exec.nome} ${exec.sobrenome}` : '—';
-      const ednNome  = edn  ? `via ${edn.nome} ${edn.sobrenome}` : '';
-      return `
-        <div class="fechamento-card glass">
-          <div class="fech-cliente">${f.nomeCliente || '—'}</div>
-          <div class="fech-local">${f.cidadeEstado || ''}</div>
-          <div class="fech-valor">${Utils.formataMoeda(f.valorGestao || 0)}</div>
-          <div class="fech-unidades">${f.numUnidades ? f.numUnidades + ' unidades' : ''}</div>
-          <div class="fech-exec">✦ ${execNome}</div>
-          ${ednNome ? `<div class="fech-edn">${ednNome}</div>` : ''}
-        </div>`;
-    }).join('');
+    fechContainer.innerHTML = ultimosFechamentos.slice(0, 5).map(f => `
+      <div class="fechamento-card glass">
+        <div class="fech-cliente">${f.cliente || '—'}</div>
+        <div class="fech-exec">✦ ${f.executivo || '—'}</div>
+        <div class="fech-valor">${Utils.formataMoeda(f.valor || 0)}</div>
+        <div class="fech-local" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${f.data || '—'}</div>
+      </div>
+    `).join('');
   },
 
   /* --- Q4: META DO MÊS ------------------------------------------ */
