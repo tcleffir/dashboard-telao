@@ -1391,6 +1391,20 @@ const Admin = {
       if (JSON.stringify(hist.fechamentos) !== JSON.stringify(FECH)) { hist.fechamentos = FECH; changed = true; }
       if (changed) DataService.saveHistorico2026(hist);
     })();
+
+    /* Migração 6: destaques março */
+    (() => {
+      const d = DataService.getDestaquesAnterior();
+      if (!d || d.mes !== 'Março 2026') {
+        DataService.saveDestaquesAnterior({
+          mes: 'Março 2026',
+          reunioes: { nome: 'Luana Furtado', valor: 17 },
+          fechamentos: null,
+          receita: null,
+        });
+      }
+    })();
+
     this.carregar_equipe();
     this.carregar_eventos();
     this.carregar_destaques();
