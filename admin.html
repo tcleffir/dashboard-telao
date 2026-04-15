@@ -1342,7 +1342,7 @@ const Admin = {
 
     /* Migração 5: reuniões e fechamentos reais 2026 */
     (() => {
-      const REUN = [16, 22, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan-Mar + Abr vazio (usa live)
+      const REUN = [21, 32, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan-Mar + Abr vazio (usa live) | Inclui Isabela
       const FECH = [10, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];   // Apenas Atacadista, sem GD
       const hist = DataService.getHistorico2026();
       let changed = false;

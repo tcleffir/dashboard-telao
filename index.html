@@ -1528,7 +1528,7 @@ const DemoData = {
     }
 
     // 5. Reuniões e fechamentos reais 2026
-    const REUN_REAIS_2026 = [16, 22, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan-Mar + Abr vazio (usa live)
+    const REUN_REAIS_2026 = [21, 32, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan-Mar + Abr vazio (usa live) | Inclui Isabela
     const FECH_REAIS_2026 = [10, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];   // Apenas Atacadista, sem GD
     const rawHist26 = localStorage.getItem('lux_historico_2026');
     const hist26    = rawHist26 ? JSON.parse(rawHist26) : { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) };
@@ -1652,7 +1652,7 @@ const DemoData = {
       fechamentos: [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1], // dados reais (clientes únicos)
     };
     const historico2026 = {
-      reunioes:    [16, 22, 36,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais
+      reunioes:    [21, 32, 36,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais (inclui Isabela em Jan+Fev)
       fechamentos: [10,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais (apenas Atacadista, sem GD)
     };
 
