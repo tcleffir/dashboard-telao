@@ -1532,6 +1532,18 @@ const DemoData = {
     if (JSON.stringify(hist26.reunioes) !== JSON.stringify(REUN_REAIS_2026)) { hist26.reunioes = REUN_REAIS_2026; changed26 = true; }
     if (JSON.stringify(hist26.fechamentos) !== JSON.stringify(FECH_REAIS_2026)) { hist26.fechamentos = FECH_REAIS_2026; changed26 = true; }
     if (changed26) localStorage.setItem('lux_historico_2026', JSON.stringify(hist26));
+
+    // 6. Destaques de março
+    const rawDestaques = localStorage.getItem('lux_destaques_anterior');
+    const destaques = rawDestaques ? JSON.parse(rawDestaques) : {};
+    if (!destaques.mes || destaques.mes !== 'Março 2026') {
+      localStorage.setItem('lux_destaques_anterior', JSON.stringify({
+        mes: 'Março 2026',
+        reunioes: { nome: 'Luana Furtado', valor: 17 },
+        fechamentos: null,
+        receita: null,
+      }));
+    }
   },
 
   seed() {
