@@ -862,7 +862,7 @@ const DataService = {
   init(onReady) {
     this._checkHashToken();
     let ready = false;
-    const done    = () => { if (!ready) { ready = true; onReady(); } };
+    const done    = () => { if (!ready) { ready = true; this._applyMigrations(); onReady(); } };
     const refresh = () => { if (ready) App.refresh(); };
 
     /* Primeira carga */
@@ -881,6 +881,20 @@ const DataService = {
     window.addEventListener('storage', e => {
       if (e.key?.startsWith('lux_')) { this._fromLS(); refresh(); }
     });
+  },
+
+  _applyMigrations() {
+    /* Migração 6: Destaques de Março */
+    const d = this._cache.destaques_anterior;
+    if (!d || !d.mes || d.mes !== 'Março 2026') {
+      this._cache.destaques_anterior = {
+        mes: 'Março 2026',
+        reunioes: { nome: 'Luana Furtado', valor: 17 },
+        fechamentos: null,
+        receita: null,
+      };
+      localStorage.setItem('lux_destaques_anterior', JSON.stringify(this._cache.destaques_anterior));
+    }
   },
 
   getVendedores()        { return this._cache.equipe; },
@@ -1533,17 +1547,7 @@ const DemoData = {
     if (JSON.stringify(hist26.fechamentos) !== JSON.stringify(FECH_REAIS_2026)) { hist26.fechamentos = FECH_REAIS_2026; changed26 = true; }
     if (changed26) localStorage.setItem('lux_historico_2026', JSON.stringify(hist26));
 
-    // 6. Destaques de março
-    const rawDestaques = localStorage.getItem('lux_destaques_anterior');
-    const destaques = rawDestaques ? JSON.parse(rawDestaques) : {};
-    if (!destaques.mes || destaques.mes !== 'Março 2026') {
-      localStorage.setItem('lux_destaques_anterior', JSON.stringify({
-        mes: 'Março 2026',
-        reunioes: { nome: 'Luana Furtado', valor: 17 },
-        fechamentos: null,
-        receita: null,
-      }));
-    }
+    // Nota: Migração 6 (destaques de março) é aplicada em DataService._applyMigrations()
   },
 
   seed() {
