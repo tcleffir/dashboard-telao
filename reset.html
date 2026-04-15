@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔄 Limpando Cache...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1f3a 0%, #2d3561 100%);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      text-align: center;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 500px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 48px;
+      margin-bottom: 20px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    p {
+      font-size: 18px;
+      margin-bottom: 10px;
+      opacity: 0.9;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(76, 175, 80, 0.2);
+      border-left: 4px solid #4caf50;
+      border-radius: 4px;
+      text-align: left;
+      font-size: 14px;
+      font-family: monospace;
+    }
+    .status div {
+      margin: 8px 0;
+    }
+    .checkmark { color: #4caf50; margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔄</h1>
+    <p><strong>Limpando Cache...</strong></p>
+    <p>Aguarde alguns segundos</p>
+    <div class="status" id="status">
+      <div><span class="checkmark">✓</span> Iniciando limpeza...</div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const messages = [];
+
+    function addMessage(msg) {
+      messages.push(msg);
+      statusEl.innerHTML = messages.map(m => `<div><span class="checkmark">✓</span> ${m}</div>`).join('');
+    }
+
+    // Limpar localStorage
+    addMessage('Limpando localStorage...');
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('lux_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    addMessage(`Removidos ${keysToRemove.length} itens`);
+
+    // Limpar sessionStorage
+    addMessage('Limpando sessionStorage...');
+    sessionStorage.clear();
+    addMessage('SessionStorage limpo');
+
+    // Redirecionar para o dashboard
+    setTimeout(() => {
+      addMessage('Redirecionando para o telão...');
+      setTimeout(() => {
+        window.location.href = 'https://tcleffir.github.io/dashboard-telao/index.html';
+      }, 1000);
+    }, 500);
+  </script>
+</body>
+</html>
