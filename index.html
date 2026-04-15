@@ -803,7 +803,7 @@ const DataService = {
   _cache: {
     equipe:             [],
     eventos:            [],
-    metas:              { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 },
+    metas:              { reunioesPorEDN: 12, fechamentosPorExecutivo: 3 },
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
@@ -1466,7 +1466,16 @@ const DemoData = {
       if (changed) localStorage.setItem('lux_equipe', JSON.stringify(equipe));
     }
 
-    // 2. Histórico real de reuniões 2025
+    // 2. Metas corretas (12 reuniões / 3 fechamentos)
+    const rawMetas = localStorage.getItem('lux_metas');
+    if (rawMetas) {
+      const m = JSON.parse(rawMetas);
+      if (m.reunioesPorEDN !== 12 || m.fechamentosPorExecutivo !== 3) {
+        localStorage.setItem('lux_metas', JSON.stringify({ reunioesPorEDN: 12, fechamentosPorExecutivo: 3 }));
+      }
+    }
+
+    // 3. Histórico real de reuniões 2025
     const REUNIOES_REAIS_2025 = [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
     const rawHist = localStorage.getItem('lux_historico_2025');
     if (rawHist) {
@@ -1577,7 +1586,7 @@ const DemoData = {
     ];
 
     /* ---------- METAS ---------- */
-    const metas = { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 };
+    const metas = { reunioesPorEDN: 12, fechamentosPorExecutivo: 3 };
 
     /* ---------- DESTAQUES MÊS ANTERIOR (Março 2026) ---------- */
     const destaques = {

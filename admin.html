@@ -941,7 +941,7 @@ const DataService = {
   _cache: {
     equipe:             [],
     eventos:            [],
-    metas:              { reunioesPorEDN: 10, fechamentosPorExecutivo: 2 },
+    metas:              { reunioesPorEDN: 12, fechamentosPorExecutivo: 3 },
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
@@ -1177,7 +1177,15 @@ const Admin = {
       if (changed) DataService._write('equipe', eq);
     })();
 
-    /* Migração 2: dados reais de reuniões 2025 */
+    /* Migração 2: metas corretas */
+    (() => {
+      const m = DataService.getMetas();
+      if (m.reunioesPorEDN !== 12 || m.fechamentosPorExecutivo !== 3) {
+        DataService.saveMetas({ reunioesPorEDN: 12, fechamentosPorExecutivo: 3 });
+      }
+    })();
+
+    /* Migração 3: dados reais de reuniões 2025 */
     (() => {
       const REAL = [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
       const hist = DataService.getHistorico2025();
@@ -1461,15 +1469,15 @@ const Admin = {
   ------------------------------------------------------------------ */
   carregar_metas() {
     const m = DataService.getMetas();
-    document.getElementById('meta-reunioes').value    = m.reunioesPorEDN || 10;
-    document.getElementById('meta-fechamentos').value = m.fechamentosPorExecutivo || 2;
+    document.getElementById('meta-reunioes').value    = m.reunioesPorEDN || 12;
+    document.getElementById('meta-fechamentos').value = m.fechamentosPorExecutivo || 3;
   },
 
   salvarMetas() {
     DataService.autoSnapshot();
     DataService.saveMetas({
-      reunioesPorEDN:         parseInt(document.getElementById('meta-reunioes').value) || 10,
-      fechamentosPorExecutivo: parseInt(document.getElementById('meta-fechamentos').value) || 2,
+      reunioesPorEDN:         parseInt(document.getElementById('meta-reunioes').value) || 12,
+      fechamentosPorExecutivo: parseInt(document.getElementById('meta-fechamentos').value) || 3,
     });
     this.toast('Metas salvas!');
   },
