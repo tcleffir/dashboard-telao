@@ -1320,6 +1320,16 @@ const Admin = {
         DataService.saveHistorico2025(hist);
       }
     })();
+
+    /* Migração 4: dados reais de fechamentos 2025 (clientes únicos) */
+    (() => {
+      const REAL = [4, 8, 2, 4, 9, 5, 5, 5, 7, 7, 3, 1];
+      const hist = DataService.getHistorico2025();
+      if (JSON.stringify(hist.fechamentos) !== JSON.stringify(REAL)) {
+        hist.fechamentos = REAL;
+        DataService.saveHistorico2025(hist);
+      }
+    })();
     this.carregar_equipe();
     this.carregar_eventos();
     this.carregar_destaques();

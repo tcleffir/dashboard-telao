@@ -1487,15 +1487,16 @@ const DemoData = {
     }
 
     // 3. Histórico real de reuniões 2025
-    const REUNIOES_REAIS_2025 = [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
+    const REUNIOES_REAIS_2025    = [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
+    // 4. Histórico real de fechamentos 2025 (clientes únicos)
+    const FECHAMENTOS_REAIS_2025 = [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1];
     const rawHist = localStorage.getItem('lux_historico_2025');
     if (rawHist) {
       const hist = JSON.parse(rawHist);
-      const jaAtualizado = JSON.stringify(hist.reunioes) === JSON.stringify(REUNIOES_REAIS_2025);
-      if (!jaAtualizado) {
-        hist.reunioes = REUNIOES_REAIS_2025;
-        localStorage.setItem('lux_historico_2025', JSON.stringify(hist));
-      }
+      let changed = false;
+      if (JSON.stringify(hist.reunioes)    !== JSON.stringify(REUNIOES_REAIS_2025))    { hist.reunioes    = REUNIOES_REAIS_2025;    changed = true; }
+      if (JSON.stringify(hist.fechamentos) !== JSON.stringify(FECHAMENTOS_REAIS_2025)) { hist.fechamentos = FECHAMENTOS_REAIS_2025; changed = true; }
+      if (changed) localStorage.setItem('lux_historico_2025', JSON.stringify(hist));
     }
   },
 
@@ -1609,8 +1610,8 @@ const DemoData = {
 
     /* ---------- HISTÓRICO 2025 ---------- */
     const historico2025 = {
-      reunioes:    [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16], // dados reais
-      fechamentos: [ 2,  2, 3,  2,  3,  4,  3,  2,  3,  4,  3,  2],
+      reunioes:    [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16], // dados reais
+      fechamentos: [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1], // dados reais (clientes únicos)
     };
 
     /* ---------- PERSISTE ---------- */
