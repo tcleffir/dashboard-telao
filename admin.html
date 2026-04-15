@@ -1165,7 +1165,7 @@ const Admin = {
   },
 
   inicializar() {
-    /* Migração: corrige perfil da Luana para 'Ambos' se necessário */
+    /* Migração 1: perfil da Luana → 'Ambos' */
     (() => {
       const eq = DataService.getVendedores();
       let changed = false;
@@ -1175,6 +1175,16 @@ const Admin = {
         }
       });
       if (changed) DataService._write('equipe', eq);
+    })();
+
+    /* Migração 2: dados reais de reuniões 2025 */
+    (() => {
+      const REAL = [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
+      const hist = DataService.getHistorico2025();
+      if (JSON.stringify(hist.reunioes) !== JSON.stringify(REAL)) {
+        hist.reunioes = REAL;
+        DataService.saveHistorico2025(hist);
+      }
     })();
     this.carregar_equipe();
     this.carregar_eventos();

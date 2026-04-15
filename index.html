@@ -1451,19 +1451,32 @@ const App = {
    Remove qualquer uma das chaves abaixo no localStorage para resetar.
 ==================================================================== */
 const DemoData = {
-  /** Migração: atualiza perfil da Luana para 'Ambos' se ainda estiver como 'Executivo' */
+  /** Migração: atualiza perfil da Luana para 'Ambos' e insere dados reais de 2025 */
   migrate() {
-    const raw = localStorage.getItem('lux_equipe');
-    if (!raw) return;
-    const equipe = JSON.parse(raw);
-    let changed = false;
-    equipe.forEach(v => {
-      if (v.nome === 'Luana' && v.sobrenome === 'Furtado' && v.perfil !== 'Ambos') {
-        v.perfil = 'Ambos';
-        changed = true;
+    // 1. Perfil da Luana
+    const rawEquipe = localStorage.getItem('lux_equipe');
+    if (rawEquipe) {
+      const equipe = JSON.parse(rawEquipe);
+      let changed = false;
+      equipe.forEach(v => {
+        if (v.nome === 'Luana' && v.sobrenome === 'Furtado' && v.perfil !== 'Ambos') {
+          v.perfil = 'Ambos'; changed = true;
+        }
+      });
+      if (changed) localStorage.setItem('lux_equipe', JSON.stringify(equipe));
+    }
+
+    // 2. Histórico real de reuniões 2025
+    const REUNIOES_REAIS_2025 = [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
+    const rawHist = localStorage.getItem('lux_historico_2025');
+    if (rawHist) {
+      const hist = JSON.parse(rawHist);
+      const jaAtualizado = JSON.stringify(hist.reunioes) === JSON.stringify(REUNIOES_REAIS_2025);
+      if (!jaAtualizado) {
+        hist.reunioes = REUNIOES_REAIS_2025;
+        localStorage.setItem('lux_historico_2025', JSON.stringify(hist));
       }
-    });
-    if (changed) localStorage.setItem('lux_equipe', JSON.stringify(equipe));
+    }
   },
 
   seed() {
@@ -1576,8 +1589,8 @@ const DemoData = {
 
     /* ---------- HISTÓRICO 2025 ---------- */
     const historico2025 = {
-      reunioes:    [7, 9, 11, 8, 10, 13, 9, 8, 11, 12, 10, 8],
-      fechamentos: [2, 2,  3, 2,  3,  4, 3, 2,  3,  4,  3, 2],
+      reunioes:    [14, 21, 7, 22, 30, 39, 65, 62, 83, 68, 36, 16], // dados reais
+      fechamentos: [ 2,  2, 3,  2,  3,  4,  3,  2,  3,  4,  3,  2],
     };
 
     /* ---------- PERSISTE ---------- */
