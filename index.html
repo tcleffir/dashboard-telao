@@ -201,9 +201,9 @@
     .pessoa-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 7px 11px;
-      border-radius: 10px;
+      gap: 7px;
+      padding: 5px 8px;
+      border-radius: 8px;
       flex-shrink: 0;
       transition: all 0.4s ease;
       animation: rowEntrada 0.4s ease forwards;
@@ -225,14 +225,14 @@
 
     /* Avatar */
     .avatar {
-      width: 36px;
-      height: 36px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--azul-3), var(--azul-4));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       color: white;
       flex-shrink: 0;
@@ -246,34 +246,31 @@
     .pessoa-info { flex: 1; min-width: 0; }
 
     .pessoa-nome {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 600;
       color: white;
-      white-space: normal;
-      word-break: break-word;
-      line-height: 1.35;
-      max-height: 2.7em; /* ~2 linhas */
+      white-space: nowrap;
       overflow: hidden;
-      letter-spacing: -0.2px;
+      text-overflow: ellipsis;
     }
 
     .pessoa-sub {
-      font-size: 11px;
-      color: rgba(255,255,255,0.5);
-      margin-top: 2px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 1px;
       white-space: nowrap;
     }
 
     /* Barra de progresso */
     .progress-wrap {
-      width: 60px;
+      width: 45px;
       flex-shrink: 0;
     }
 
     .progress-track {
-      height: 4px;
+      height: 3px;
       background: rgba(255,255,255,0.1);
-      border-radius: 2px;
+      border-radius: 1px;
     }
 
     .progress-fill {
@@ -285,11 +282,11 @@
 
     /* Métrica principal */
     .pessoa-valor {
-      font-size: 16px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 700;
       color: white;
       flex-shrink: 0;
-      min-width: 36px;
+      min-width: 28px;
       text-align: right;
     }
 
@@ -1284,7 +1281,7 @@ const Renderers = {
       return;
     }
 
-    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
+    container.innerHTML = ranking.slice(0, 5).map((s, i) => {
       const classe = i === 0 ? 'ouro' : i === 1 ? 'prata' : i === 2 ? 'bronze' : 'normal';
       const medal  = i === 0 ? '🥇'   : i === 1 ? '🥈'   : i === 2 ? '🥉'    : null;
       const pct    = maxVal > 0 ? Math.round((s.reunioesRealizadas / maxVal) * 100) : 0;
@@ -1325,7 +1322,7 @@ const Renderers = {
       return;
     }
 
-    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
+    container.innerHTML = ranking.slice(0, 5).map((s, i) => {
       const classe = i === 0 ? 'destaque-exec' : 'normal';
       const medal  = i === 0 ? '🥇' : null;
       const avatarHTML = s.vendedor.foto
