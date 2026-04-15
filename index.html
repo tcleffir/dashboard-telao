@@ -1036,6 +1036,7 @@ const RankingEngine = {
     const hist    = DataService.getHistorico2025();
     const hist26  = DataService.getHistorico2026();
     const eventos = DataService.getEventos();
+    const metas   = DataService.getMetas();
     const mesAtual = Utils.mesAtual(); // 0-based
 
     /* Contagem ao vivo de 2026 a partir dos eventos */
@@ -1057,9 +1058,14 @@ const RankingEngine = {
       return live; // mês atual: sempre ao vivo
     });
 
-    /* Projeção linear: média dos meses concluídos × 12 */
-    const projReun  = this._projetar(reunioes2026_live, mesAtual);
-    const projFech  = this._projetar(fechamentos2026,   mesAtual);
+    /* Projeção de reuniões: Meta/EDN × Quantidade de EDNs (fixo, não linear) */
+    const countEdns = DataService.getVendedores().filter(v => v.perfil === 'EDN' || v.perfil === 'Ambos').length;
+    const metaReunPorEdn = metas.reunioesPorEDN || 12;
+    const projReunTotal = countEdns * metaReunPorEdn;
+    const projReun = Array(12).fill(0).map((_, i) => i <= mesAtual ? reunioes2026_live[i] : projReunTotal);
+
+    /* Projeção de fechamentos: linear (média dos meses concluídos × 12) */
+    const projFech  = this._projetar(fechamentos2026, mesAtual);
 
     return {
       reunioes:   { hist2025: hist.reunioes,    real2026: reunioes2026_live, proj2026: projReun },
