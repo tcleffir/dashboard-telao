@@ -7,8 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     /* ================================================================
        CONFIGURAÇÃO — altere a senha aqui
@@ -895,6 +893,25 @@
         </div>
 
         <div class="card">
+          <div class="card-titulo">🔗 Sincronização ao Vivo</div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
+            Cole aqui um <strong>GitHub Personal Access Token</strong> com escopo <code style="background:var(--bg);padding:2px 6px;border-radius:4px;">gist</code>.
+            Depois clique em <strong>"Copiar URL do Telão"</strong> e abra esse link no computador do telão — a sincronização fica ativa automaticamente.
+          </p>
+          <div class="form-group" style="max-width:460px; margin-bottom:12px;">
+            <label>GitHub Token</label>
+            <input type="password" id="sync-token" placeholder="ghp_... ou gho_..."
+                   style="font-family:monospace; letter-spacing:0.05em;">
+          </div>
+          <div class="form-actions" style="margin-bottom:10px;">
+            <button class="btn btn-primary"  onclick="Admin.salvarToken()">💾 Salvar Token</button>
+            <button class="btn btn-ghost"    onclick="Admin.copiarUrlTelao()">📋 Copiar URL do Telão</button>
+            <button class="btn btn-ghost btn-sm" onclick="Admin.testarSync()" style="margin-left:auto">⟳ Testar Sync</button>
+          </div>
+          <div id="sync-status" style="font-size:12px; color:var(--text-muted);"></div>
+        </div>
+
+        <div class="card">
           <div class="card-titulo">Histórico de Versões</div>
           <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
             Snapshot automático criado a cada <strong>save</strong> (máx. 1 por dia, guardando os últimos 60).
@@ -926,15 +943,12 @@
 const SENHA_ADMIN = 'lux2025';
 
 /* ====================================================================
-   FIREBASE CONFIG — mesma config do index.html
+   SINCRONIZAÇÃO — GitHub Gist como banco de dados compartilhado
 ==================================================================== */
-const FIREBASE_CONFIG = {
-  apiKey:      'COLE_AQUI',
-  databaseURL: 'https://SEU-PROJETO-default-rtdb.firebaseio.com',
-};
+const GIST_ID = '5a54b0044992dc5954d032995be46431';
 
 /* ====================================================================
-   DATASERVICE — lê/escreve no Firebase; fallback: localStorage
+   DATASERVICE
 ==================================================================== */
 const DataService = {
 
@@ -946,8 +960,10 @@ const DataService = {
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
   },
-  _firebase: false,
-  _db: null,
+  _syncTimer: null,
+
+  _getToken()  { return localStorage.getItem('lux_gh_token') || ''; },
+  _setToken(t) { localStorage.setItem('lux_gh_token', t.trim()); },
 
   _fromLS() {
     const r = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -959,39 +975,81 @@ const DataService = {
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025')     || this._cache.historico_2025;
   },
 
-  /** Conecta ao Firebase e chama onReady() quando os dados estiverem carregados */
-  init(onReady) {
-    const configured = FIREBASE_CONFIG.databaseURL &&
-                       !FIREBASE_CONFIG.databaseURL.includes('SEU-PROJETO');
-    if (!configured) {
-      this._fromLS();
-      onReady();
-      return;
-    }
-    try {
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-      this._db      = firebase.database();
-      this._firebase = true;
-      this._db.ref('lux').once('value').then(snap => {
-        const d = snap.val() || {};
-        if (Array.isArray(d.equipe))          this._cache.equipe             = d.equipe;
-        if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
-        if (d.metas)                          this._cache.metas              = d.metas;
-        if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
-        if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
-        if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
-        onReady();
-      }).catch(e => { console.error('[Firebase]', e); this._fromLS(); onReady(); });
-    } catch(e) {
-      console.error('[Firebase] init falhou — usando localStorage.', e);
-      this._fromLS(); onReady();
-    }
+  _applyGist(d) {
+    if (!d) return;
+    if (Array.isArray(d.equipe))          this._cache.equipe             = d.equipe;
+    if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
+    if (d.metas)                          this._cache.metas              = d.metas;
+    if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
+    if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
+    if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
   },
 
-  /** Escreve no Firebase E no localStorage (localStorage serve para snapshots locais) */
+  /** Carrega dados do Gist (usa token se disponível) */
+  init(onReady) {
+    const token = this._getToken();
+    fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        ...(token ? { 'Authorization': `token ${token}` } : {}),
+      },
+      cache: 'no-store',
+    })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(gist => {
+      const raw = gist?.files?.['lux_data.json']?.content;
+      if (raw) {
+        const d = JSON.parse(raw);
+        this._applyGist(d);
+        // Se Gist estava vazio e localStorage tem dados, faz push inicial
+        if (!d.equipe?.length) { this._fromLS(); this._pushGist(); }
+      } else { this._fromLS(); }
+    })
+    .catch(e => { console.warn('[Admin] Gist falhou, usando localStorage.', e); this._fromLS(); })
+    .finally(onReady);
+  },
+
+  /** Estado completo para gravar no Gist */
+  _fullState() {
+    return {
+      equipe:             this._cache.equipe,
+      eventos:            this._cache.eventos,
+      metas:              this._cache.metas,
+      destaques_anterior: this._cache.destaques_anterior,
+      bonus_receita:      this._cache.bonus_receita,
+      historico_2025:     this._cache.historico_2025,
+    };
+  },
+
+  /** Grava estado atual no Gist (debounced 500 ms) */
+  _pushGist() {
+    clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => {
+      const token = this._getToken();
+      if (!token) return; // sem token, só localStorage
+      fetch(`https://api.github.com/gists/${GIST_ID}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept':        'application/vnd.github+json',
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          files: { 'lux_data.json': { content: JSON.stringify(this._fullState()) } }
+        }),
+      })
+      .then(r => r.ok
+        ? Admin.toast('✓ Sincronizado ao vivo!')
+        : Admin.toast('⚠ Sync falhou (' + r.status + ')'))
+      .catch(() => Admin.toast('⚠ Sem conexão com GitHub'));
+    }, 500);
+  },
+
+  /** Escreve no cache + localStorage + Gist */
   _write(key, value) {
+    this._cache[key] = value;
     localStorage.setItem('lux_' + key, JSON.stringify(value));
-    if (this._firebase && this._db) this._db.ref('lux/' + key).set(value);
+    this._pushGist();
   },
 
   getVendedores()   { return this._cache.equipe; },
@@ -1006,27 +1064,24 @@ const DataService = {
     this._write('equipe', this._cache.equipe);
   },
 
-  getEventos()     { return this._cache.eventos; },
-  saveEvento(e) {
-    this._cache.eventos.push(e);
-    this._write('eventos', this._cache.eventos);
-  },
+  getEventos()   { return this._cache.eventos; },
+  saveEvento(e)  { this._cache.eventos.push(e); this._write('eventos', this._cache.eventos); },
   removeEvento(id) {
     this._cache.eventos = this._cache.eventos.filter(e => e.id !== id);
     this._write('eventos', this._cache.eventos);
   },
 
-  getMetas()             { return this._cache.metas; },
-  saveMetas(m)           { this._cache.metas = m;              this._write('metas', m); },
+  getMetas()               { return this._cache.metas; },
+  saveMetas(m)             { this._cache.metas = m;              this._write('metas', m); },
 
-  getDestaquesAnterior() { return this._cache.destaques_anterior; },
-  saveDestaquesAnterior(d) { this._cache.destaques_anterior = d; this._write('destaques_anterior', d); },
+  getDestaquesAnterior()   { return this._cache.destaques_anterior; },
+  saveDestaquesAnterior(d) { this._cache.destaques_anterior = d;  this._write('destaques_anterior', d); },
 
-  getBonusReceita()      { return this._cache.bonus_receita; },
-  saveBonusReceita(b)    { this._cache.bonus_receita = b;     this._write('bonus_receita', b); },
+  getBonusReceita()        { return this._cache.bonus_receita; },
+  saveBonusReceita(b)      { this._cache.bonus_receita = b;       this._write('bonus_receita', b); },
 
-  getHistorico2025()     { return this._cache.historico_2025; },
-  saveHistorico2025(h)   { this._cache.historico_2025 = h;    this._write('historico_2025', h); },
+  getHistorico2025()       { return this._cache.historico_2025; },
+  saveHistorico2025(h)     { this._cache.historico_2025 = h;      this._write('historico_2025', h); },
 
   exportData() {
     const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
@@ -1038,22 +1093,17 @@ const DataService = {
 
   importData(json) {
     const obj = JSON.parse(json);
-    // Escreve no Firebase
-    if (this._firebase && this._db) {
-      const fb = {};
-      const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
-                    lux_destaques_anterior:'destaques_anterior',
-                    lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
-      Object.entries(map).forEach(([lsKey, fbKey]) => {
-        if (obj[lsKey] != null) fb[fbKey] = obj[lsKey];
-      });
-      this._db.ref('lux').update(fb);
-    }
-    // Escreve no localStorage
-    Object.entries(obj).forEach(([k, v]) => { if (v !== null) localStorage.setItem(k, JSON.stringify(v)); });
+    const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
+                  lux_destaques_anterior:'destaques_anterior',
+                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
+    Object.entries(map).forEach(([lsKey, cacheKey]) => {
+      if (obj[lsKey] != null) { this._cache[cacheKey] = obj[lsKey]; localStorage.setItem(lsKey, JSON.stringify(obj[lsKey])); }
+    });
+    if (obj.lux_snapshots) localStorage.setItem('lux_snapshots', JSON.stringify(obj.lux_snapshots));
+    this._pushGist();
   },
 
-  /* ---- Snapshots (ficam apenas no localStorage — são dados de auditoria local) ---- */
+  /* ---- Snapshots (auditoria local, não sincronizados) ---- */
   _getSnapshots()     { return JSON.parse(localStorage.getItem('lux_snapshots') || '[]'); },
   _saveSnapshots(arr) { localStorage.setItem('lux_snapshots', JSON.stringify(arr)); },
 
@@ -1064,12 +1114,9 @@ const DataService = {
     snaps.unshift({
       id: Date.now(), dataLabel: label || hoje, timestamp: Date.now(),
       data: {
-        lux_equipe:             this.getVendedores(),
-        lux_eventos:            this.getEventos(),
-        lux_metas:              this.getMetas(),
-        lux_destaques_anterior: this.getDestaquesAnterior(),
-        lux_bonus_receita:      this.getBonusReceita(),
-        lux_historico_2025:     this.getHistorico2025(),
+        lux_equipe: this.getVendedores(), lux_eventos: this.getEventos(),
+        lux_metas:  this.getMetas(),      lux_destaques_anterior: this.getDestaquesAnterior(),
+        lux_bonus_receita: this.getBonusReceita(), lux_historico_2025: this.getHistorico2025(),
       },
     });
     this._saveSnapshots(snaps.slice(0, 60));
@@ -1081,20 +1128,15 @@ const DataService = {
     const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
                   lux_destaques_anterior:'destaques_anterior',
                   lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
-    Object.entries(map).forEach(([lsKey, fbKey]) => {
+    Object.entries(map).forEach(([lsKey, cacheKey]) => {
       const v = snap.data[lsKey];
-      if (v != null) {
-        this._cache[fbKey] = v;
-        localStorage.setItem(lsKey, JSON.stringify(v));
-        if (this._firebase && this._db) this._db.ref('lux/' + fbKey).set(v);
-      }
+      if (v != null) { this._cache[cacheKey] = v; localStorage.setItem(lsKey, JSON.stringify(v)); }
     });
+    this._pushGist();
     return true;
   },
 
-  deleteSnapshot(id) {
-    this._saveSnapshots(this._getSnapshots().filter(s => s.id !== id));
-  },
+  deleteSnapshot(id) { this._saveSnapshots(this._getSnapshots().filter(s => s.id !== id)); },
 };
 
 /* ====================================================================
@@ -1134,9 +1176,8 @@ const Admin = {
       document.getElementById('campo-senha').value = '';
       return;
     }
-    // Mostra loading enquanto Firebase conecta
     const btn = document.querySelector('#tela-login .btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Conectando…'; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Carregando…'; }
 
     DataService.init(() => {
       if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
@@ -1560,7 +1601,48 @@ const Admin = {
      BACKUP + HISTÓRICO DE VERSÕES
   ------------------------------------------------------------------ */
   carregar_backup() {
+    // Mostra token atual (mascarado)
+    const token = DataService._getToken();
+    const el = document.getElementById('sync-token');
+    if (el) el.placeholder = token ? '••••••••••••••••••••' + token.slice(-4) : 'ghp_... ou gho_...';
+    const st = document.getElementById('sync-status');
+    if (st) st.textContent = token ? '✓ Token configurado. Clique em "Copiar URL do Telão" para vincular o telão.' : '⚠ Token não configurado — dados não sincronizam entre computadores.';
     this._renderSnapshots();
+  },
+
+  salvarToken() {
+    const el = document.getElementById('sync-token');
+    const t  = el?.value?.trim();
+    if (!t) { alert('Cole o token antes de salvar.'); return; }
+    DataService._setToken(t);
+    el.value = '';
+    el.placeholder = '••••••••••••••••••••' + t.slice(-4);
+    document.getElementById('sync-status').textContent = '✓ Token salvo! Agora clique em "Copiar URL do Telão".';
+    this.toast('Token salvo!');
+  },
+
+  copiarUrlTelao() {
+    const token = DataService._getToken();
+    if (!token) { alert('Salve o token primeiro.'); return; }
+    const base = location.href.replace('admin.html', '');
+    const url  = `${base}#gh=${encodeURIComponent(token)}`;
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        document.getElementById('sync-status').textContent = '✓ URL copiada! Cole no navegador do computador do telão.';
+        this.toast('URL do Telão copiada! Cole no computador do telão.');
+      })
+      .catch(() => {
+        prompt('Copie esta URL e abra no computador do telão:', url);
+      });
+  },
+
+  testarSync() {
+    const st = document.getElementById('sync-status');
+    if (st) st.textContent = '⟳ Testando conexão com o Gist...';
+    DataService._pushGist();
+    setTimeout(() => {
+      if (st) st.textContent = st.textContent.startsWith('⟳') ? '⚠ Sem resposta — verifique o token.' : st.textContent;
+    }, 4000);
   },
 
   _renderSnapshots() {

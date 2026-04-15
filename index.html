@@ -8,8 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     /* ================================================================
        VARIÁVEIS DA MARCA LUX
@@ -786,17 +784,14 @@
            os Renderers não precisem de refatoração.
 ==================================================================== */
 /* ====================================================================
-   FIREBASE CONFIG
-   Preencha após criar o projeto em console.firebase.google.com
-   Deixe como está para usar localStorage (modo offline).
+   SINCRONIZAÇÃO — GitHub Gist como banco de dados compartilhado
+   Admin escreve → Gist → Telão lê a cada 20 s (sem nenhum cadastro).
+   Token configurado via Admin → Backup → Sincronização.
 ==================================================================== */
-const FIREBASE_CONFIG = {
-  apiKey:      'COLE_AQUI',
-  databaseURL: 'https://SEU-PROJETO-default-rtdb.firebaseio.com',
-};
+const GIST_ID = '5a54b0044992dc5954d032995be46431';
 
 /* ====================================================================
-   DATASERVICE — lê do Firebase em tempo real; fallback: localStorage
+   DATASERVICE
 ==================================================================== */
 const DataService = {
 
@@ -808,7 +803,18 @@ const DataService = {
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
   },
-  _firebase: false,
+
+  _getToken()  { return localStorage.getItem('lux_gh_token') || ''; },
+
+  /* Extrai token do hash da URL (ex: ...#gh=TOKEN) e limpa a URL */
+  _checkHashToken() {
+    const m = location.hash.match(/[#&]gh=([^&]+)/);
+    if (m) {
+      localStorage.setItem('lux_gh_token', decodeURIComponent(m[1]));
+      history.replaceState(null, '', location.pathname + location.search);
+      console.log('[Lux] Token extraído da URL e salvo.');
+    }
+  },
 
   _fromLS() {
     const r = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -820,7 +826,7 @@ const DataService = {
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025');
   },
 
-  _applySnap(d) {
+  _applyGist(d) {
     if (!d) return;
     if (Array.isArray(d.equipe))          this._cache.equipe             = d.equipe;
     if (Array.isArray(d.eventos))         this._cache.eventos            = d.eventos;
@@ -830,39 +836,44 @@ const DataService = {
     if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
   },
 
-  /** Inicializa e chama onReady() quando os dados estiverem prontos */
+  _fetchGist() {
+    const token = this._getToken();
+    return fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        ...(token ? { 'Authorization': `token ${token}` } : {}),
+      },
+      cache: 'no-store',
+    })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(gist => {
+      const raw = gist?.files?.['lux_data.json']?.content;
+      if (raw) this._applyGist(JSON.parse(raw));
+    });
+  },
+
   init(onReady) {
-    const configured = FIREBASE_CONFIG.databaseURL &&
-                       !FIREBASE_CONFIG.databaseURL.includes('SEU-PROJETO');
+    this._checkHashToken();
+    let ready = false;
+    const done    = () => { if (!ready) { ready = true; onReady(); } };
+    const refresh = () => { if (ready) App.refresh(); };
 
-    if (!configured) {
-      /* Modo offline — localStorage + storage event entre abas */
-      this._fromLS();
-      window.addEventListener('storage', e => {
-        if (e.key && e.key.startsWith('lux_')) { this._fromLS(); App.refresh(); }
-      });
-      onReady();
-      return;
-    }
+    /* Primeira carga */
+    this._fetchGist()
+      .catch(e => { console.warn('[Lux] Gist indisponível, usando localStorage.', e); this._fromLS(); })
+      .finally(done);
 
-    /* Modo Firebase — listener em tempo real */
-    try {
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-      this._firebase = true;
-      let first = true;
-      firebase.database().ref('lux').on('value', snap => {
-        this._applySnap(snap.val());
-        if (first) { first = false; onReady(); }
-        else        { App.refresh(); }
-      }, err => {
-        console.error('[Firebase]', err);
-        if (first) { first = false; this._fromLS(); onReady(); }
-      });
-    } catch(e) {
-      console.error('[Firebase] init falhou — usando localStorage.', e);
-      this._fromLS();
-      onReady();
-    }
+    /* Polling a cada 20 s */
+    setInterval(() => {
+      this._fetchGist()
+        .then(refresh)
+        .catch(e => console.warn('[Lux] Poll falhou:', e));
+    }, 20000);
+
+    /* Fallback: mesma máquina */
+    window.addEventListener('storage', e => {
+      if (e.key?.startsWith('lux_')) { this._fromLS(); refresh(); }
+    });
   },
 
   getVendedores()        { return this._cache.equipe; },
