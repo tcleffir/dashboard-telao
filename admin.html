@@ -1044,6 +1044,7 @@ const DataService = {
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
+    historico_2026:     { fechamentos: Array(12).fill(0) },
   },
   _syncTimer: null,
 
@@ -1058,6 +1059,7 @@ const DataService = {
     if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior') || this._cache.destaques_anterior;
     if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita')      || [];
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025')     || this._cache.historico_2025;
+    if (r('lux_historico_2026'))     this._cache.historico_2026     = r('lux_historico_2026')     || this._cache.historico_2026;
   },
 
   _applyGist(d) {
@@ -1068,6 +1070,7 @@ const DataService = {
     if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
     if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
     if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
+    if (d.historico_2026)                 this._cache.historico_2026     = d.historico_2026;
   },
 
   /** Carrega dados do Gist (usa token se disponível) */
@@ -1103,6 +1106,7 @@ const DataService = {
       destaques_anterior: this._cache.destaques_anterior,
       bonus_receita:      this._cache.bonus_receita,
       historico_2025:     this._cache.historico_2025,
+      historico_2026:     this._cache.historico_2026,
     };
   },
 
@@ -1167,10 +1171,12 @@ const DataService = {
 
   getHistorico2025()       { return this._cache.historico_2025; },
   saveHistorico2025(h)     { this._cache.historico_2025 = h;      this._write('historico_2025', h); },
+  getHistorico2026()       { return this._cache.historico_2026; },
+  saveHistorico2026(h)     { this._cache.historico_2026 = h;      this._write('historico_2026', h); },
 
   exportData() {
     const keys = ['lux_equipe','lux_eventos','lux_metas','lux_destaques_anterior',
-                  'lux_bonus_receita','lux_historico_2025','lux_snapshots'];
+                  'lux_bonus_receita','lux_historico_2025','lux_historico_2026','lux_snapshots'];
     const obj = {};
     keys.forEach(k => { obj[k] = JSON.parse(localStorage.getItem(k) || 'null'); });
     return JSON.stringify(obj, null, 2);
@@ -1180,7 +1186,8 @@ const DataService = {
     const obj = JSON.parse(json);
     const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
                   lux_destaques_anterior:'destaques_anterior',
-                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
+                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025',
+                  lux_historico_2026:'historico_2026' };
     Object.entries(map).forEach(([lsKey, cacheKey]) => {
       if (obj[lsKey] != null) { this._cache[cacheKey] = obj[lsKey]; localStorage.setItem(lsKey, JSON.stringify(obj[lsKey])); }
     });
@@ -1202,6 +1209,7 @@ const DataService = {
         lux_equipe: this.getVendedores(), lux_eventos: this.getEventos(),
         lux_metas:  this.getMetas(),      lux_destaques_anterior: this.getDestaquesAnterior(),
         lux_bonus_receita: this.getBonusReceita(), lux_historico_2025: this.getHistorico2025(),
+        lux_historico_2026: this.getHistorico2026(),
       },
     });
     this._saveSnapshots(snaps.slice(0, 60));
@@ -1212,7 +1220,8 @@ const DataService = {
     if (!snap) return false;
     const map = { lux_equipe:'equipe', lux_eventos:'eventos', lux_metas:'metas',
                   lux_destaques_anterior:'destaques_anterior',
-                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025' };
+                  lux_bonus_receita:'bonus_receita', lux_historico_2025:'historico_2025',
+                  lux_historico_2026:'historico_2026' };
     Object.entries(map).forEach(([lsKey, cacheKey]) => {
       const v = snap.data[lsKey];
       if (v != null) { this._cache[cacheKey] = v; localStorage.setItem(lsKey, JSON.stringify(v)); }
@@ -1328,6 +1337,16 @@ const Admin = {
       if (JSON.stringify(hist.fechamentos) !== JSON.stringify(REAL)) {
         hist.fechamentos = REAL;
         DataService.saveHistorico2025(hist);
+      }
+    })();
+
+    /* Migração 5: fechamentos reais 2026 — meses já concluídos (clientes únicos) */
+    (() => {
+      const REAL = [15, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      const hist = DataService.getHistorico2026();
+      if (JSON.stringify(hist.fechamentos) !== JSON.stringify(REAL)) {
+        hist.fechamentos = REAL;
+        DataService.saveHistorico2026(hist);
       }
     })();
     this.carregar_equipe();

@@ -802,6 +802,7 @@ const DataService = {
     destaques_anterior: { mes: '', reunioes: null, fechamentos: null, receita: null },
     bonus_receita:      [],
     historico_2025:     { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) },
+    historico_2026:     { fechamentos: Array(12).fill(0) },
   },
 
   _getToken()  { return localStorage.getItem('lux_gh_token') || ''; },
@@ -824,6 +825,7 @@ const DataService = {
     if (r('lux_destaques_anterior')) this._cache.destaques_anterior = r('lux_destaques_anterior');
     if (r('lux_bonus_receita'))      this._cache.bonus_receita      = r('lux_bonus_receita');
     if (r('lux_historico_2025'))     this._cache.historico_2025     = r('lux_historico_2025');
+    if (r('lux_historico_2026'))     this._cache.historico_2026     = r('lux_historico_2026');
   },
 
   _applyGist(d) {
@@ -834,6 +836,7 @@ const DataService = {
     if (d.destaques_anterior)             this._cache.destaques_anterior = d.destaques_anterior;
     if (Array.isArray(d.bonus_receita))   this._cache.bonus_receita      = d.bonus_receita;
     if (d.historico_2025)                 this._cache.historico_2025     = d.historico_2025;
+    if (d.historico_2026)                 this._cache.historico_2026     = d.historico_2026;
   },
 
   _fetchGist() {
@@ -883,6 +886,7 @@ const DataService = {
   getDestaquesAnterior() { return this._cache.destaques_anterior; },
   getBonusReceita()      { return this._cache.bonus_receita; },
   getHistorico2025()     { return this._cache.historico_2025; },
+  getHistorico2026()     { return this._cache.historico_2026; },
 };
 
 /* ====================================================================
@@ -1029,27 +1033,37 @@ const RankingEngine = {
 
   /* Dados mensais do ano passado e deste ano para o gráfico */
   dadosGrafico() {
-    const hist = DataService.getHistorico2025();
+    const hist    = DataService.getHistorico2025();
+    const hist26  = DataService.getHistorico2026();
     const eventos = DataService.getEventos();
     const mesAtual = Utils.mesAtual(); // 0-based
 
-    const reunioes2026 = Array(12).fill(0);
-    const fechamentos2026 = Array(12).fill(0);
+    /* Contagem ao vivo de 2026 a partir dos eventos */
+    const reunioes2026_live    = Array(12).fill(0);
+    const fechamentos2026_live = Array(12).fill(0);
 
     eventos.forEach(e => {
       if (!e.data || !e.data.startsWith('2026-')) return;
       const mes = parseInt(e.data.split('-')[1]) - 1;
-      if (e.tipo === 'reuniao_realizada') reunioes2026[mes]++;
-      if (e.tipo === 'fechamento')         fechamentos2026[mes]++;
+      if (e.tipo === 'reuniao_realizada') reunioes2026_live[mes]++;
+      if (e.tipo === 'fechamento')        fechamentos2026_live[mes]++;
+    });
+
+    /* Fechamentos blended: meses passados usam override estático quando disponível;
+       mês atual e futuros usam sempre a contagem ao vivo dos eventos.           */
+    const fechamentos2026 = fechamentos2026_live.map((live, m) => {
+      if (m > mesAtual) return 0;
+      if (m < mesAtual) return (hist26.fechamentos[m] > 0 ? hist26.fechamentos[m] : live);
+      return live; // mês atual: sempre ao vivo
     });
 
     /* Projeção linear: média dos meses concluídos × 12 */
-    const projReun   = this._projetar(reunioes2026, mesAtual);
-    const projFech   = this._projetar(fechamentos2026, mesAtual);
+    const projReun  = this._projetar(reunioes2026_live, mesAtual);
+    const projFech  = this._projetar(fechamentos2026,   mesAtual);
 
     return {
-      reunioes:  { hist2025: hist.reunioes,   real2026: reunioes2026,   proj2026: projReun },
-      fechamentos:{ hist2025: hist.fechamentos,real2026: fechamentos2026, proj2026: projFech },
+      reunioes:   { hist2025: hist.reunioes,    real2026: reunioes2026_live, proj2026: projReun },
+      fechamentos:{ hist2025: hist.fechamentos,  real2026: fechamentos2026,   proj2026: projFech },
       mesAtual,
     };
   },
@@ -1498,6 +1512,15 @@ const DemoData = {
       if (JSON.stringify(hist.fechamentos) !== JSON.stringify(FECHAMENTOS_REAIS_2025)) { hist.fechamentos = FECHAMENTOS_REAIS_2025; changed = true; }
       if (changed) localStorage.setItem('lux_historico_2025', JSON.stringify(hist));
     }
+
+    // 5. Fechamentos reais 2026 — meses já concluídos (clientes únicos)
+    const FECH_REAIS_2026 = [15, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const rawHist26 = localStorage.getItem('lux_historico_2026');
+    const hist26    = rawHist26 ? JSON.parse(rawHist26) : { fechamentos: Array(12).fill(0) };
+    if (JSON.stringify(hist26.fechamentos) !== JSON.stringify(FECH_REAIS_2026)) {
+      hist26.fechamentos = FECH_REAIS_2026;
+      localStorage.setItem('lux_historico_2026', JSON.stringify(hist26));
+    }
   },
 
   seed() {
@@ -1613,6 +1636,9 @@ const DemoData = {
       reunioes:    [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16], // dados reais
       fechamentos: [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1], // dados reais (clientes únicos)
     };
+    const historico2026 = {
+      fechamentos: [15,  0,  7,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais (clientes únicos)
+    };
 
     /* ---------- PERSISTE ---------- */
     localStorage.setItem('lux_equipe',             JSON.stringify(equipe));
@@ -1620,6 +1646,7 @@ const DemoData = {
     localStorage.setItem('lux_metas',              JSON.stringify(metas));
     localStorage.setItem('lux_destaques_anterior', JSON.stringify(destaques));
     localStorage.setItem('lux_historico_2025',     JSON.stringify(historico2025));
+    localStorage.setItem('lux_historico_2026',     JSON.stringify(historico2026));
 
     console.log('[Lux Dashboard] Dados fictícios carregados. Use o admin.html para gerenciar.');
   },
