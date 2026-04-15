@@ -246,13 +246,14 @@
     .pessoa-info { flex: 1; min-width: 0; }
 
     .pessoa-nome {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       color: white;
-      white-space: nowrap;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.3;
+      max-height: 2.6em; /* ~2 linhas */
       overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.2;
     }
 
     .pessoa-sub {
@@ -1609,26 +1610,28 @@ const DemoData = {
       { id:'mf6', vendedorId:'exec5', data:'2026-03-18', tipo:'fechamento', nomeCliente:'Alto da Serra',    cidadeEstado:'Curitiba / PR',       numUnidades:88,  valorGestao:7600,  ednId:'edn5' },
 
       /* === ABRIL 2026 — mes corrente === */
+      /* Bianca (edn1): 4 */
       { id:'a1',  vendedorId:'edn1',  data:'2026-04-03', tipo:'reuniao_realizada' },
-      { id:'a2',  vendedorId:'edn1',  data:'2026-04-05', tipo:'reuniao_realizada' },
-      { id:'a3',  vendedorId:'edn1',  data:'2026-04-07', tipo:'reuniao_realizada' },
-      { id:'a4',  vendedorId:'edn1',  data:'2026-04-09', tipo:'reuniao_realizada' },
-      { id:'a5',  vendedorId:'edn1',  data:'2026-04-11', tipo:'reuniao_realizada' },
-      { id:'a6',  vendedorId:'edn1',  data:'2026-04-12', tipo:'reuniao_realizada' },
-      { id:'a7',  vendedorId:'edn1',  data:'2026-04-14', tipo:'reuniao_realizada' },
-      { id:'a8',  vendedorId:'edn2',  data:'2026-04-02', tipo:'reuniao_realizada' },
-      { id:'a9',  vendedorId:'edn2',  data:'2026-04-04', tipo:'reuniao_realizada' },
-      { id:'a10', vendedorId:'edn2',  data:'2026-04-07', tipo:'reuniao_realizada' },
-      { id:'a11', vendedorId:'edn2',  data:'2026-04-10', tipo:'reuniao_realizada' },
-      { id:'a12', vendedorId:'edn2',  data:'2026-04-13', tipo:'reuniao_realizada' },
-      { id:'a13', vendedorId:'edn3',  data:'2026-04-03', tipo:'reuniao_realizada' },
-      { id:'a14', vendedorId:'edn3',  data:'2026-04-08', tipo:'reuniao_realizada' },
-      { id:'a15', vendedorId:'edn3',  data:'2026-04-12', tipo:'reuniao_realizada' },
-      { id:'a16', vendedorId:'edn4',  data:'2026-04-06', tipo:'reuniao_realizada' },
-      { id:'a17', vendedorId:'edn4',  data:'2026-04-11', tipo:'reuniao_realizada' },
-      { id:'a18', vendedorId:'edn5',  data:'2026-04-04', tipo:'reuniao_realizada' },
-      { id:'a19', vendedorId:'edn5',  data:'2026-04-09', tipo:'reuniao_realizada' },
-      { id:'a20', vendedorId:'edn5',  data:'2026-04-14', tipo:'reuniao_realizada' },
+      { id:'a2',  vendedorId:'edn1',  data:'2026-04-07', tipo:'reuniao_realizada' },
+      { id:'a3',  vendedorId:'edn1',  data:'2026-04-10', tipo:'reuniao_realizada' },
+      { id:'a4',  vendedorId:'edn1',  data:'2026-04-13', tipo:'reuniao_realizada' },
+      /* Caio (edn2): 1 */
+      { id:'a5',  vendedorId:'edn2',  data:'2026-04-08', tipo:'reuniao_realizada' },
+      /* Giovanna (edn3): 1 */
+      { id:'a6',  vendedorId:'edn3',  data:'2026-04-05', tipo:'reuniao_realizada' },
+      /* Jhonatas (edn4): 5 */
+      { id:'a7',  vendedorId:'edn4',  data:'2026-04-02', tipo:'reuniao_realizada' },
+      { id:'a8',  vendedorId:'edn4',  data:'2026-04-06', tipo:'reuniao_realizada' },
+      { id:'a9',  vendedorId:'edn4',  data:'2026-04-09', tipo:'reuniao_realizada' },
+      { id:'a10', vendedorId:'edn4',  data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'a11', vendedorId:'edn4',  data:'2026-04-14', tipo:'reuniao_realizada' },
+      /* Luana (exec3): 6 */
+      { id:'a12', vendedorId:'exec3', data:'2026-04-01', tipo:'reuniao_realizada' },
+      { id:'a13', vendedorId:'exec3', data:'2026-04-03', tipo:'reuniao_realizada' },
+      { id:'a14', vendedorId:'exec3', data:'2026-04-04', tipo:'reuniao_realizada' },
+      { id:'a15', vendedorId:'exec3', data:'2026-04-08', tipo:'reuniao_realizada' },
+      { id:'a16', vendedorId:'exec3', data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'a17', vendedorId:'exec3', data:'2026-04-12', tipo:'reuniao_realizada' },
       /* Fechamentos de abril — cards Q2 */
       { id:'af1', vendedorId:'exec1', data:'2026-04-04', tipo:'fechamento', nomeCliente:'BTG Lag Campinas', cidadeEstado:'Campinas / SP',      numUnidades:280, valorGestao:24800, ednId:'edn1' },
       { id:'af2', vendedorId:'exec2', data:'2026-04-08', tipo:'fechamento', nomeCliente:'Porto Brasilia',   cidadeEstado:'Brasilia / DF',      numUnidades:210, valorGestao:19600, ednId:null   },
