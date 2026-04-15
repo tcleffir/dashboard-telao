@@ -192,7 +192,7 @@
     .ranking-list {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
       overflow: hidden;
       flex: 1;
     }
@@ -201,8 +201,8 @@
     .pessoa-row {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 5px 8px;
+      gap: 6px;
+      padding: 4px 7px;
       border-radius: 8px;
       flex-shrink: 0;
       transition: all 0.4s ease;
@@ -1290,7 +1290,7 @@ const Renderers = {
       return;
     }
 
-    container.innerHTML = ranking.slice(0, 5).map((s, i) => {
+    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
       const classe = i === 0 ? 'ouro' : i === 1 ? 'prata' : i === 2 ? 'bronze' : 'normal';
       const medal  = i === 0 ? '🥇'   : i === 1 ? '🥈'   : i === 2 ? '🥉'    : null;
       const pct    = maxVal > 0 ? Math.round((s.reunioesRealizadas / maxVal) * 100) : 0;
@@ -1331,7 +1331,7 @@ const Renderers = {
       return;
     }
 
-    container.innerHTML = ranking.slice(0, 5).map((s, i) => {
+    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
       const classe = i === 0 ? 'destaque-exec' : 'normal';
       const medal  = i === 0 ? '🥇' : null;
       const avatarHTML = s.vendedor.foto
