@@ -670,6 +670,67 @@
     }
 
     /* ================================================================
+       Q4 — LINHAS INDIVIDUAIS POR PESSOA
+    ================================================================ */
+    .meta-pessoa-row {
+      display: flex;
+      align-items: center;
+      padding: 5px 8px;
+      border-radius: 7px;
+      flex-shrink: 0;
+    }
+
+    .meta-pessoa-row.batida     { background: var(--glass-green); border: 1px solid var(--glass-green-border); }
+    .meta-pessoa-row.nao-batida { background: var(--glass-bg);    border: 1px solid var(--glass-border); }
+
+    .meta-pessoa-info { flex: 1; min-width: 0; }
+
+    .meta-pessoa-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .meta-pessoa-nome {
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta-pessoa-contagem {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--verde-3);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    .meta-pessoa-contagem .meta-sep  { color: rgba(255,255,255,0.25); font-weight: 400; }
+    .meta-pessoa-contagem .meta-goal { color: rgba(255,255,255,0.4);  font-weight: 600; font-size: 11px; }
+
+    .meta-mini-track {
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 1px;
+      margin-top: 4px;
+    }
+
+    .meta-mini-fill {
+      height: 100%;
+      border-radius: 1px;
+      transition: width 0.8s ease;
+    }
+
+    .meta-mini-fill.ok      { background: linear-gradient(90deg, var(--verde-2), var(--verde-3)); }
+    .meta-mini-fill.parcial { background: linear-gradient(90deg, var(--azul-3), var(--azul-4)); }
+
+    /* ================================================================
        EMPTY STATE
     ================================================================ */
     .empty-state {
@@ -750,7 +811,10 @@
       <div class="destaques-container" id="destaques-container"></div>
       <div class="q3-divider"></div>
       <div class="fechamentos-q3">
-        <div class="section-title">Últimos Fechamentos do Mês</div>
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          Últimos Fechamentos do Mês
+          <span id="fech-totais-badge" style="font-size:12px;font-weight:700;color:var(--verde-3);letter-spacing:0.05em;white-space:nowrap;"></span>
+        </div>
         <div class="fechamentos-list" id="lista-fechamentos"></div>
       </div>
     </div>
@@ -880,7 +944,7 @@ const DataService = {
     /* Polling a cada 20 s */
     setInterval(() => {
       this._fetchGist()
-        .then(refresh)
+        .then(() => { this._applyMigrations(); refresh(); })
         .catch(e => console.warn('[Lux] Poll falhou:', e));
     }, 20000);
 
@@ -891,16 +955,34 @@ const DataService = {
   },
 
   _applyMigrations() {
-    /* Migração 6: Destaques de Março */
+    /* Migração 6: Destaques de Março 2026 (dados reais) */
     const d = this._cache.destaques_anterior;
-    if (!d || !d.mes || d.mes !== 'Março 2026') {
+    if (!d || !d.mes || d.mes !== 'Março 2026' || !d.fechamentos || !d.receita) {
       this._cache.destaques_anterior = {
         mes: 'Março 2026',
-        reunioes: { nome: 'Luana Furtado', valor: 17 },
-        fechamentos: null,
-        receita: null,
+        reunioes:    { nome: 'Luana Furtado',   valor: 17   },
+        fechamentos: { nome: 'Brenda Gino',      valor: 1    },
+        receita:     { nome: 'Gabriel Gracia',   valor: 2500 },
       };
       localStorage.setItem('lux_destaques_anterior', JSON.stringify(this._cache.destaques_anterior));
+    }
+
+    /* Migração 7: Abril 2026 = mínimo 4 fechamentos no gráfico (inclui Fábio) */
+    if ((this._cache.historico_2026.fechamentos[3] || 0) < 4) {
+      this._cache.historico_2026.fechamentos[3] = 4;
+    }
+
+    /* Migração 7b: Fábio sempre marcado como ocultarTelao */
+    this._cache.equipe.forEach(v => {
+      if (v.nome === 'Fábio' && !v.ocultarTelao) v.ocultarTelao = true;
+    });
+
+    /* Migração 8: Garante Lorenzo Zanussi no time (EDN) */
+    const _lorenzo = this._cache.equipe.find(v => v.nome === 'Lorenzo');
+    if (!_lorenzo) {
+      this._cache.equipe.push({ id: 'edn6', nome: 'Lorenzo', sobrenome: 'Zanussi', perfil: 'EDN', foto: null });
+    } else if (!_lorenzo.sobrenome) {
+      _lorenzo.sobrenome = 'Zanussi';
     }
   },
 
@@ -1044,7 +1126,7 @@ const RankingEngine = {
   /* Ranking de Executivos por receita gerada */
   rankingExecutivos() {
     return this.calcularEstatisticas()
-      .filter(s => s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos')
+      .filter(s => (s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos') && !s.vendedor.ocultarTelao)
       .sort((a, b) => b.totalReceita - a.totalReceita || b.fechamentos - a.fechamentos);
   },
 
@@ -1089,7 +1171,7 @@ const RankingEngine = {
     const fechamentos2026 = fechamentos2026_live.map((live, m) => {
       if (m > mesAtual) return 0;
       if (m < mesAtual) return (hist26.fechamentos[m] > 0 ? hist26.fechamentos[m] : live);
-      return live; // mês atual: sempre ao vivo
+      return Math.max(live, hist26.fechamentos[m] || 0); // mês atual: usa o maior entre live e override
     });
 
     /* Projeção de reuniões: Meta/EDN × Quantidade de EDNs (fixo, não linear) */
@@ -1290,7 +1372,7 @@ const Renderers = {
       return;
     }
 
-    container.innerHTML = ranking.slice(0, 6).map((s, i) => {
+    container.innerHTML = ranking.slice(0, 7).map((s, i) => {
       const classe = i === 0 ? 'ouro' : i === 1 ? 'prata' : i === 2 ? 'bronze' : 'normal';
       const medal  = i === 0 ? '🥇'   : i === 1 ? '🥈'   : i === 2 ? '🥉'    : null;
       const pct    = maxVal > 0 ? Math.round((s.reunioesRealizadas / maxVal) * 100) : 0;
@@ -1369,9 +1451,9 @@ const Renderers = {
     if (d.mes) titulo.textContent = `Destaques — ${d.mes}`;
 
     const cards = [
-      { key: 'reunioes',    icone: '🤝', categoria: 'Mais Reuniões',    labelSufixo: 'reuniões'  },
-      { key: 'fechamentos', icone: '🏆', categoria: 'Mais Fechamentos', labelSufixo: 'fechamentos' },
-      { key: 'receita',     icone: '💰', categoria: 'Maior Receita',    labelSufixo: '',          isMoeda: true },
+      { key: 'reunioes',    icone: '🤝', categoria: 'Mais Reuniões',    labelSufixo: 'Reuniões'    },
+      { key: 'fechamentos', icone: '🏆', categoria: 'Mais Fechamentos', labelSufixo: 'Fechamentos' },
+      { key: 'receita',     icone: '💰', categoria: 'Maior Receita',    labelSufixo: '',            isMoeda: true },
     ];
 
     if (!d.reunioes && !d.fechamentos && !d.receita) {
@@ -1386,8 +1468,10 @@ const Renderers = {
             <div class="dest-nome" style="color:rgba(255,255,255,0.35)">A definir</div>
           </div>`;
         const iniciais = Utils.iniciais(info.nome || '?');
-        const valorFmt = c.isMoeda ? Utils.formataMoeda(info.valor) : `${info.valor}`;
-        const sufixo   = !c.isMoeda ? `<div class="dest-label">${info.valor} ${c.labelSufixo}</div>` : '';
+        /* Sem duplicidade: número e label juntos, tudo verde e mesmo tamanho */
+        const valorFmt = c.isMoeda
+          ? Utils.formataMoeda(info.valor)
+          : `${info.valor} ${c.labelSufixo}`;
         return `
           <div class="destaque-row glass glass-green">
             <div class="dest-icone">${c.icone}</div>
@@ -1395,7 +1479,6 @@ const Renderers = {
             <div class="dest-avatar">${iniciais}</div>
             <div class="dest-nome">${info.nome || '—'}</div>
             <div class="dest-valor">${valorFmt}</div>
-            ${sufixo}
           </div>`;
       }).join('');
     }
@@ -1419,23 +1502,31 @@ const Renderers = {
         <div class="fech-local" style="font-size:11px; color:var(--text-muted); margin-top:4px;">${f.data || '—'}</div>
       </div>
     `).join('');
+
+    /* Badge de totais: quantidade + faturamento */
+    const totaisBadge = document.getElementById('fech-totais-badge');
+    if (totaisBadge) {
+      const totalFat = ultimosFechamentos.reduce((s, f) => s + (f.valor || 0), 0);
+      totaisBadge.textContent = `${ultimosFechamentos.length} fech. · ${Utils.formataMoeda(totalFat)}`;
+    }
   },
 
   /* --- Q4: META DO MÊS ------------------------------------------ */
   q4() {
     const metas    = DataService.getMetas();
     const stats    = RankingEngine.calcularEstatisticas();
-    const edns     = stats.filter(s => s.vendedor.perfil === 'EDN'       || s.vendedor.perfil === 'Ambos');
-    const execs    = stats.filter(s => s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos');
+    const edns     = stats.filter(s =>  (s.vendedor.perfil === 'EDN'       || s.vendedor.perfil === 'Ambos'));
+    const execs    = stats.filter(s => (s.vendedor.perfil === 'Executivo' || s.vendedor.perfil === 'Ambos') && !s.vendedor.ocultarTelao);
 
     this._renderMetaPanel('meta-edns', 'rodape-edns', edns,
       s => s.reunioesRealizadas, metas.reunioesPorEDN, 'reuniões');
 
     this._renderMetaPanel('meta-execs', 'rodape-execs', execs,
-      s => s.fechamentos, metas.fechamentosPorExecutivo, 'fechamentos');
+      s => s.fechamentos, metas.fechamentosPorExecutivo, 'fechamentos',
+      s => s.totalReceita);
   },
 
-  _renderMetaPanel(listId, rodapeId, stats, metricFn, metaValor, label) {
+  _renderMetaPanel(listId, rodapeId, stats, metricFn, metaValor, label, receitaFn = null) {
     const container = document.getElementById(listId);
     const rodape    = document.getElementById(rodapeId);
     if (!container) return;
@@ -1446,24 +1537,37 @@ const Renderers = {
       return;
     }
 
+    /* Ordena por desempenho (maior primeiro), empate por nome */
+    const sorted = [...stats].sort((a, b) =>
+      metricFn(b) - metricFn(a) || a.vendedor.nome.localeCompare(b.vendedor.nome)
+    );
+
     let totalRealizado = 0;
-    const totalMeta    = stats.length * metaValor;
+    const totalMeta = stats.length * metaValor;
 
-    container.innerHTML = stats.map(s => {
-      const realizado = metricFn(s);
-      totalRealizado += realizado;
-      const batida  = realizado >= metaValor;
-      const classe  = batida ? 'batida' : 'nao-batida';
-
+    container.innerHTML = sorted.map(s => {
+      const val  = metricFn(s);
+      totalRealizado += val;
+      const pct  = metaValor > 0 ? Math.min(100, Math.round((val / metaValor) * 100)) : 0;
+      const ok   = val >= metaValor;
+      const nome = s.vendedor.nome + (s.vendedor.sobrenome ? ' ' + s.vendedor.sobrenome : '');
       return `
-        <div class="meta-row ${classe}">
-          <div class="meta-valor-grande">${realizado}</div>
+        <div class="meta-pessoa-row ${ok ? 'batida' : 'nao-batida'}">
+          <div class="meta-pessoa-info">
+            <div class="meta-pessoa-header">
+              <div class="meta-pessoa-nome">${nome}</div>
+              <div class="meta-pessoa-contagem">${val}<span class="meta-sep"> | </span><span class="meta-goal">${metaValor}</span></div>
+            </div>
+            <div class="meta-mini-track">
+              <div class="meta-mini-fill ${ok ? 'ok' : 'parcial'}" style="width:${pct}%"></div>
+            </div>
+          </div>
         </div>
       `;
     }).join('');
 
     if (rodape) {
-      rodape.textContent = `Time realizou ${totalRealizado} de ${totalMeta} ${label}`;
+      rodape.textContent = `Total: ${totalRealizado} | Meta: ${totalMeta} ${label}`;
     }
   },
 };
@@ -1521,7 +1625,7 @@ const DemoData = {
     // 3. Histórico real de reuniões 2025
     const REUNIOES_REAIS_2025    = [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
     // 4. Histórico real de fechamentos 2025 (clientes únicos)
-    const FECHAMENTOS_REAIS_2025 = [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1];
+    const FECHAMENTOS_REAIS_2025 = [ 4,  8,  2,  4,  8,  5,  5,  5,  7,  7,  3,  1];
     const rawHist = localStorage.getItem('lux_historico_2025');
     if (rawHist) {
       const hist = JSON.parse(rawHist);
@@ -1533,7 +1637,7 @@ const DemoData = {
 
     // 5. Reuniões e fechamentos reais 2026
     const REUN_REAIS_2026 = [21, 32, 36, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Jan-Mar + Abr vazio (usa live) | Inclui Isabela
-    const FECH_REAIS_2026 = [10, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0];   // Apenas Atacadista, sem GD
+    const FECH_REAIS_2026 = [10, 0, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0];   // Jan:10, Fev:0, Mar:2, Abr:4
     const rawHist26 = localStorage.getItem('lux_historico_2026');
     const hist26    = rawHist26 ? JSON.parse(rawHist26) : { reunioes: Array(12).fill(0), fechamentos: Array(12).fill(0) };
     let changed26 = false;
@@ -1555,64 +1659,20 @@ const DemoData = {
       { id: 'edn3',  nome: 'Giovanna', sobrenome: 'Bispo',    perfil: 'EDN',       foto: null },
       { id: 'edn4',  nome: 'Jhonatas', sobrenome: 'Baldez',   perfil: 'EDN',       foto: null },
       { id: 'edn5',  nome: 'Gabriel',  sobrenome: 'Veiga',    perfil: 'EDN',       foto: null },
-      { id: 'exec1', nome: 'Brenda',   sobrenome: 'Gino',     perfil: 'Executivo', foto: null },
-      { id: 'exec2', nome: 'Brunno',   sobrenome: 'Meneguette',perfil: 'Executivo',foto: null },
-      { id: 'exec3', nome: 'Luana',    sobrenome: 'Furtado',  perfil: 'Ambos',     foto: null },
-      { id: 'exec4', nome: 'Vanessa',  sobrenome: 'Moral',    perfil: 'Executivo', foto: null },
-      { id: 'exec5', nome: 'Gabriel',  sobrenome: 'Gracia',   perfil: 'Executivo', foto: null },
+      { id: 'edn6',  nome: 'Lorenzo',  sobrenome: 'Zanussi',  perfil: 'EDN',       foto: null },
+      { id: 'exec1', nome: 'Brenda',   sobrenome: 'Gino',       perfil: 'Executivo', foto: null },
+      { id: 'exec2', nome: 'Brunno',   sobrenome: 'Meneguette', perfil: 'Executivo', foto: null },
+      { id: 'exec3', nome: 'Luana',    sobrenome: 'Furtado',    perfil: 'Ambos',     foto: null },
+      { id: 'exec4', nome: 'Vanessa',  sobrenome: 'Moral',      perfil: 'Executivo', foto: null },
+      { id: 'exec5', nome: 'Gabriel',  sobrenome: 'Gracia',     perfil: 'Executivo', foto: null },
+      { id: 'execF', nome: 'Fábio',    sobrenome: '',           perfil: 'Executivo', foto: null, ocultarTelao: true },
     ];
 
     /* ---------- EVENTOS ----------
        Reunioes Jan-Abr 2026 com a equipe real                    */
     const eventos = [
       /* === JANEIRO 2026 === */
-      { id:'j1',  vendedorId:'edn1',  data:'2026-01-08', tipo:'reuniao_realizada' },
-      { id:'j2',  vendedorId:'edn2',  data:'2026-01-10', tipo:'reuniao_realizada' },
-      { id:'j3',  vendedorId:'edn2',  data:'2026-01-15', tipo:'reuniao_realizada' },
-      { id:'j4',  vendedorId:'edn3',  data:'2026-01-12', tipo:'reuniao_realizada' },
-      { id:'j5',  vendedorId:'edn4',  data:'2026-01-20', tipo:'reuniao_realizada' },
-      { id:'j6',  vendedorId:'edn5',  data:'2026-01-18', tipo:'reuniao_realizada' },
-      { id:'jf1', vendedorId:'exec1', data:'2026-01-17', tipo:'fechamento', nomeCliente:'Alpha Residencial', cidadeEstado:'Campinas / SP',      numUnidades:120, valorGestao:9800,  ednId:'edn2' },
-      { id:'jf2', vendedorId:'exec2', data:'2026-01-25', tipo:'fechamento', nomeCliente:'Vila dos Ipes',     cidadeEstado:'Ribeirao Preto / SP', numUnidades:88,  valorGestao:7200,  ednId:'edn1' },
-
-      /* === FEVEREIRO 2026 === */
-      { id:'f1',  vendedorId:'edn1',  data:'2026-02-04', tipo:'reuniao_realizada' },
-      { id:'f2',  vendedorId:'edn1',  data:'2026-02-11', tipo:'reuniao_realizada' },
-      { id:'f3',  vendedorId:'edn1',  data:'2026-02-18', tipo:'reuniao_realizada' },
-      { id:'f4',  vendedorId:'edn2',  data:'2026-02-06', tipo:'reuniao_realizada' },
-      { id:'f5',  vendedorId:'edn2',  data:'2026-02-13', tipo:'reuniao_realizada' },
-      { id:'f6',  vendedorId:'edn3',  data:'2026-02-10', tipo:'reuniao_realizada' },
-      { id:'f7',  vendedorId:'edn3',  data:'2026-02-24', tipo:'reuniao_realizada' },
-      { id:'f8',  vendedorId:'edn4',  data:'2026-02-14', tipo:'reuniao_realizada' },
-      { id:'f9',  vendedorId:'edn5',  data:'2026-02-08', tipo:'reuniao_realizada' },
-      { id:'f10', vendedorId:'edn5',  data:'2026-02-20', tipo:'reuniao_realizada' },
-      { id:'ff1', vendedorId:'exec1', data:'2026-02-12', tipo:'fechamento', nomeCliente:'Brisa do Vale',    cidadeEstado:'Belo Horizonte / MG', numUnidades:204, valorGestao:16400, ednId:'edn1' },
-      { id:'ff2', vendedorId:'exec3', data:'2026-02-18', tipo:'fechamento', nomeCliente:'Terras do Sol',    cidadeEstado:'Goiania / GO',        numUnidades:156, valorGestao:12800, ednId:null   },
-      { id:'ff3', vendedorId:'exec4', data:'2026-02-28', tipo:'fechamento', nomeCliente:'Park Residence',   cidadeEstado:'Curitiba / PR',       numUnidades:72,  valorGestao:6400,  ednId:'edn3' },
-
-      /* === MARCO 2026 === */
-      { id:'m1',  vendedorId:'edn1',  data:'2026-03-05', tipo:'reuniao_realizada' },
-      { id:'m2',  vendedorId:'edn1',  data:'2026-03-12', tipo:'reuniao_realizada' },
-      { id:'m3',  vendedorId:'edn1',  data:'2026-03-20', tipo:'reuniao_realizada' },
-      { id:'m4',  vendedorId:'edn1',  data:'2026-03-27', tipo:'reuniao_realizada' },
-      { id:'m5',  vendedorId:'edn2',  data:'2026-03-03', tipo:'reuniao_realizada' },
-      { id:'m6',  vendedorId:'edn2',  data:'2026-03-07', tipo:'reuniao_realizada' },
-      { id:'m7',  vendedorId:'edn2',  data:'2026-03-11', tipo:'reuniao_realizada' },
-      { id:'m8',  vendedorId:'edn2',  data:'2026-03-19', tipo:'reuniao_realizada' },
-      { id:'m9',  vendedorId:'edn3',  data:'2026-03-08', tipo:'reuniao_realizada' },
-      { id:'m10', vendedorId:'edn3',  data:'2026-03-17', tipo:'reuniao_realizada' },
-      { id:'m11', vendedorId:'edn3',  data:'2026-03-25', tipo:'reuniao_realizada' },
-      { id:'m12', vendedorId:'edn4',  data:'2026-03-10', tipo:'reuniao_realizada' },
-      { id:'m13', vendedorId:'edn4',  data:'2026-03-22', tipo:'reuniao_realizada' },
-      { id:'m14', vendedorId:'edn5',  data:'2026-03-06', tipo:'reuniao_realizada' },
-      { id:'m15', vendedorId:'edn5',  data:'2026-03-15', tipo:'reuniao_realizada' },
-      { id:'m16', vendedorId:'edn5',  data:'2026-03-24', tipo:'reuniao_realizada' },
-      { id:'mf1', vendedorId:'exec2', data:'2026-03-06', tipo:'fechamento', nomeCliente:'Gran Vista',       cidadeEstado:'Florianopolis / SC',  numUnidades:180, valorGestao:18600, ednId:'edn2' },
-      { id:'mf2', vendedorId:'exec1', data:'2026-03-13', tipo:'fechamento', nomeCliente:'Espaco Vivo',      cidadeEstado:'Sao Paulo / SP',      numUnidades:140, valorGestao:14200, ednId:'edn1' },
-      { id:'mf3', vendedorId:'exec1', data:'2026-03-21', tipo:'fechamento', nomeCliente:'Cond. Horizonte',  cidadeEstado:'Porto Alegre / RS',   numUnidades:220, valorGestao:22000, ednId:'edn4' },
-      { id:'mf4', vendedorId:'exec3', data:'2026-03-10', tipo:'fechamento', nomeCliente:'Blue Sky',         cidadeEstado:'Recife / PE',         numUnidades:168, valorGestao:15800, ednId:'edn3' },
-      { id:'mf5', vendedorId:'exec4', data:'2026-03-25', tipo:'fechamento', nomeCliente:'Viver Mais',       cidadeEstado:'Fortaleza / CE',      numUnidades:104, valorGestao:9200,  ednId:null   },
-      { id:'mf6', vendedorId:'exec5', data:'2026-03-18', tipo:'fechamento', nomeCliente:'Alto da Serra',    cidadeEstado:'Curitiba / PR',       numUnidades:88,  valorGestao:7600,  ednId:'edn5' },
+      /* Jan/Fev/Mar: reuniões e fechamentos contabilizados via historico_2026 apenas no gráfico */
 
       /* === ABRIL 2026 — mes corrente === */
       /* Bianca (edn1): 4 */
@@ -1624,12 +1684,13 @@ const DemoData = {
       { id:'a5',  vendedorId:'edn2',  data:'2026-04-08', tipo:'reuniao_realizada' },
       /* Giovanna (edn3): 1 */
       { id:'a6',  vendedorId:'edn3',  data:'2026-04-05', tipo:'reuniao_realizada' },
-      /* Jhonatas (edn4): 5 */
+      /* Jhonatas (edn4): 6 */
       { id:'a7',  vendedorId:'edn4',  data:'2026-04-02', tipo:'reuniao_realizada' },
       { id:'a8',  vendedorId:'edn4',  data:'2026-04-06', tipo:'reuniao_realizada' },
       { id:'a9',  vendedorId:'edn4',  data:'2026-04-09', tipo:'reuniao_realizada' },
       { id:'a10', vendedorId:'edn4',  data:'2026-04-11', tipo:'reuniao_realizada' },
       { id:'a11', vendedorId:'edn4',  data:'2026-04-14', tipo:'reuniao_realizada' },
+      { id:'a11b',vendedorId:'edn4',  data:'2026-04-16', tipo:'reuniao_realizada' },
       /* Luana (exec3): 6 */
       { id:'a12', vendedorId:'exec3', data:'2026-04-01', tipo:'reuniao_realizada' },
       { id:'a13', vendedorId:'exec3', data:'2026-04-03', tipo:'reuniao_realizada' },
@@ -1637,10 +1698,11 @@ const DemoData = {
       { id:'a15', vendedorId:'exec3', data:'2026-04-08', tipo:'reuniao_realizada' },
       { id:'a16', vendedorId:'exec3', data:'2026-04-11', tipo:'reuniao_realizada' },
       { id:'a17', vendedorId:'exec3', data:'2026-04-12', tipo:'reuniao_realizada' },
-      /* Fechamentos de abril — cards Q2 */
-      { id:'af1', vendedorId:'exec1', data:'2026-04-04', tipo:'fechamento', nomeCliente:'BTG Lag Campinas', cidadeEstado:'Campinas / SP',      numUnidades:280, valorGestao:24800, ednId:'edn1' },
-      { id:'af2', vendedorId:'exec2', data:'2026-04-08', tipo:'fechamento', nomeCliente:'Porto Brasilia',   cidadeEstado:'Brasilia / DF',      numUnidades:210, valorGestao:19600, ednId:null   },
-      { id:'af3', vendedorId:'exec3', data:'2026-04-12', tipo:'fechamento', nomeCliente:'Cond. Sao Luiz',   cidadeEstado:'Sao Paulo / SP',     numUnidades:96,  valorGestao:11400, ednId:'edn3' },
+      /* Fechamentos de abril — dados reais */
+      { id:'af1', vendedorId:'exec2', data:'2026-04-02', tipo:'fechamento', nomeCliente:'MAM Museu de Arte Moderna RJ', cidadeEstado:'Rio de Janeiro / RJ', numUnidades:1, valorGestao:3000, ednId:null },
+      { id:'af2', vendedorId:'exec1', data:'2026-04-14', tipo:'fechamento', nomeCliente:'MEC Plant',                    cidadeEstado:'',                    numUnidades:1, valorGestao:2500, ednId:null },
+      { id:'af3', vendedorId:'exec5', data:'2026-04-15', tipo:'fechamento', nomeCliente:'Maestro do Brasil',            cidadeEstado:'',                    numUnidades:2, valorGestao:2200, ednId:null },
+      { id:'afF', vendedorId:'execF', data:'2026-04-10', tipo:'fechamento', nomeCliente:'',                             cidadeEstado:'',                    numUnidades:1, valorGestao:0,    ednId:null },
     ];
 
     /* ---------- METAS ---------- */
@@ -1649,27 +1711,35 @@ const DemoData = {
     /* ---------- DESTAQUES MÊS ANTERIOR (Março 2026) ---------- */
     const destaques = {
       mes: 'Março 2026',
-      reunioes:    { nome: 'Bianca Oliveira',   valor: 8  },
-      fechamentos: { nome: 'Brenda Gino',       valor: 2  },
-      receita:     { nome: 'Brunno Meneguette', valor: 18600 },
+      reunioes:    { nome: 'Luana Furtado',  valor: 17   },
+      fechamentos: { nome: 'Brenda Gino',    valor: 1    },
+      receita:     { nome: 'Gabriel Gracia', valor: 2500 },
     };
 
     /* ---------- HISTÓRICO 2025 ---------- */
     const historico2025 = {
       reunioes:    [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16], // dados reais
-      fechamentos: [ 4,  8,  2,  4,  9,  5,  5,  5,  7,  7,  3,  1], // dados reais (clientes únicos)
+      fechamentos: [ 4,  8,  2,  4,  8,  5,  5,  5,  7,  7,  3,  1], // dados reais (clientes únicos)
     };
     const historico2026 = {
       reunioes:    [21, 32, 36,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais (inclui Isabela em Jan+Fev)
-      fechamentos: [10,  0,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0], // dados reais (apenas Atacadista, sem GD)
+      fechamentos: [10,  0,  2,  4,  0,  0,  0,  0,  0,  0,  0,  0], // Jan:10, Fev:0, Mar:2, Abr:4 (inclui Fábio)
     };
 
+    /* ---------- ÚLTIMOS FECHAMENTOS DO MÊS (abril 2026) ---------- */
+    const ultimosFechamentos = [
+      { cliente: 'Maestro do Brasil',            executivo: 'Gabriel Gracia',  valor: 2200, data: '15/04/2026' },
+      { cliente: 'MEC Plant',                    executivo: 'Brenda Gino',     valor: 2500, data: '14/04/2026' },
+      { cliente: 'MAM Museu de Arte Moderna RJ', executivo: 'Brunno Meneguette', valor: 3000, data: '02/04/2026' },
+    ];
+
     /* ---------- PERSISTE ---------- */
-    localStorage.setItem('lux_equipe',             JSON.stringify(equipe));
-    localStorage.setItem('lux_eventos',            JSON.stringify(eventos));
-    localStorage.setItem('lux_metas',              JSON.stringify(metas));
-    localStorage.setItem('lux_destaques_anterior', JSON.stringify(destaques));
-    localStorage.setItem('lux_historico_2025',     JSON.stringify(historico2025));
+    localStorage.setItem('lux_equipe',               JSON.stringify(equipe));
+    localStorage.setItem('lux_eventos',              JSON.stringify(eventos));
+    localStorage.setItem('lux_metas',                JSON.stringify(metas));
+    localStorage.setItem('lux_destaques_anterior',   JSON.stringify(destaques));
+    localStorage.setItem('lux_ultimos_fechamentos',  JSON.stringify(ultimosFechamentos));
+    localStorage.setItem('lux_historico_2025',       JSON.stringify(historico2025));
     localStorage.setItem('lux_historico_2026',     JSON.stringify(historico2026));
 
     console.log('[Lux Dashboard] Dados fictícios carregados. Use o admin.html para gerenciar.');
