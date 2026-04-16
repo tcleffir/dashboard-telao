@@ -1256,16 +1256,16 @@ const RankingEngine = {
 
     /* Reuniões blended: meses passados usam dados reais estáticos;
        mês atual usa a contagem ao vivo dos eventos.                */
-    const reunioes2026 = reunioes2026_live.map((live, m) => {
-      if (m > mesAtual) return 0;
+    const reunioes2026 = reunioes2026_live.map((live, m) => {
+      if (m > mesAtual) return null;
       if (m < mesAtual) return (hist26.reunioes[m] > 0 ? hist26.reunioes[m] : live);
       return live; // mês atual: sempre ao vivo
     });
 
     /* Fechamentos blended: meses passados usam override estático quando disponível;
        mês atual e futuros usam sempre a contagem ao vivo dos eventos.           */
-    const fechamentos2026 = fechamentos2026_live.map((live, m) => {
-      if (m > mesAtual) return 0;
+    const fechamentos2026 = fechamentos2026_live.map((live, m) => {
+      if (m > mesAtual) return null;
       if (m < mesAtual) return (hist26.fechamentos[m] > 0 ? hist26.fechamentos[m] : live);
       return Math.max(live, hist26.fechamentos[m] || 0); // mês atual: usa o maior entre live e override
     });
