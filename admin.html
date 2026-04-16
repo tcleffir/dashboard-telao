@@ -689,6 +689,13 @@
                        style="font-size:11px; background:transparent; border:none; padding:0; color:var(--text-muted)">
               </div>
             </div>
+            <div class="form-group full" style="margin-top:4px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="checkbox" id="equipe-ocultar" style="width:16px;height:16px;cursor:pointer;accent-color:var(--danger);">
+                <span>Ocultar do Telão</span>
+                <span style="font-size:10px;color:var(--text-muted);font-weight:400;">(conta nos gráficos, mas não aparece no ranking)</span>
+              </label>
+            </div>
           </div>
           <div class="form-actions">
             <button class="btn btn-success" onclick="Admin.salvarMembro()">✓ Salvar Membro</button>
@@ -1392,16 +1399,49 @@ const Admin = {
       if (changed) DataService.saveHistorico2026(hist);
     })();
 
-    /* Migração 6: destaques março */
+    /* Migração 6: destaques março 2026 (dados reais) */
     (() => {
       const d = DataService.getDestaquesAnterior();
-      if (!d || d.mes !== 'Março 2026') {
+      if (!d || d.mes !== 'Março 2026' || !d.fechamentos || !d.receita) {
         DataService.saveDestaquesAnterior({
           mes: 'Março 2026',
-          reunioes: { nome: 'Luana Furtado', valor: 17 },
-          fechamentos: null,
-          receita: null,
+          reunioes:    { nome: 'Luana Furtado',  valor: 17   },
+          fechamentos: { nome: 'Brenda Gino',    valor: 1    },
+          receita:     { nome: 'Gabriel Gracia', valor: 2500 },
         });
+      }
+    })();
+
+    /* Migração 7: historico 2026 — Abril = 4 fechamentos */
+    (() => {
+      const hist = DataService.getHistorico2026();
+      if ((hist.fechamentos[3] || 0) < 4) {
+        hist.fechamentos[3] = 4;
+        DataService.saveHistorico2026(hist);
+      }
+    })();
+
+    /* Migração 8: garante Lorenzo Zanussi no time */
+    (() => {
+      const eq = DataService.getVendedores();
+      const lorenzo = eq.find(v => v.nome === 'Lorenzo');
+      let changed = false;
+      if (!lorenzo) {
+        eq.push({ id: 'edn6', nome: 'Lorenzo', sobrenome: 'Zanussi', perfil: 'EDN', foto: null });
+        changed = true;
+      } else if (!lorenzo.sobrenome) {
+        lorenzo.sobrenome = 'Zanussi'; changed = true;
+      }
+      if (changed) DataService._write('equipe', eq);
+    })();
+
+    /* Migração 9: garante Fábio com ocultarTelao */
+    (() => {
+      const eq = DataService.getVendedores();
+      const fabio = eq.find(v => v.nome === 'Fábio');
+      if (fabio && !fabio.ocultarTelao) {
+        fabio.ocultarTelao = true;
+        DataService._write('equipe', eq);
       }
     })();
 
@@ -1443,9 +1483,11 @@ const Admin = {
       const avatarHTML = v.foto
         ? `<span class="avatar-mini"><img src="${v.foto}" alt=""></span>`
         : `<span class="avatar-mini">${Utils.iniciais(v.nome + ' ' + v.sobrenome)}</span>`;
+      const ocultoBadge = v.ocultarTelao
+        ? `<span class="badge" style="background:rgba(224,82,82,0.15);color:var(--danger);margin-left:6px;">OCULTO</span>` : '';
       return `
         <tr>
-          <td>${avatarHTML}${v.nome} ${v.sobrenome}</td>
+          <td>${avatarHTML}${v.nome} ${v.sobrenome}${ocultoBadge}</td>
           <td><span class="badge badge-${v.perfil === 'EDN' ? 'edn' : v.perfil === 'Ambos' ? 'ambos' : 'exec'}">${v.perfil}</span></td>
           <td>
             <button class="btn btn-ghost btn-sm" onclick="Admin.editarMembro('${v.id}')">✏ Editar</button>
@@ -1484,8 +1526,9 @@ const Admin = {
 
     if (!nome || !sobrenome) { alert('Preencha nome e sobrenome.'); return; }
 
+    const ocultarTelao = document.getElementById('equipe-ocultar').checked;
     DataService.autoSnapshot();
-    DataService.saveVendedor({ id, nome, sobrenome, perfil, foto });
+    DataService.saveVendedor({ id, nome, sobrenome, perfil, foto, ...(ocultarTelao ? { ocultarTelao: true } : {}) });
     this.limparFormEquipe();
     this.carregar_equipe();
     this.toast('Membro salvo!');
@@ -1498,6 +1541,7 @@ const Admin = {
     document.getElementById('equipe-nome').value      = v.nome;
     document.getElementById('equipe-sobrenome').value = v.sobrenome;
     document.getElementById('equipe-perfil').value    = v.perfil;
+    document.getElementById('equipe-ocultar').checked = !!v.ocultarTelao;
     document.getElementById('form-equipe-titulo').textContent = 'Editar Membro';
     const preview = document.getElementById('equipe-foto-preview');
     if (v.foto) {
@@ -1523,6 +1567,7 @@ const Admin = {
     document.getElementById('equipe-nome').value      = '';
     document.getElementById('equipe-sobrenome').value = '';
     document.getElementById('equipe-perfil').value    = 'EDN';
+    document.getElementById('equipe-ocultar').checked = false;
     document.getElementById('equipe-foto-input').value = '';
     const preview = document.getElementById('equipe-foto-preview');
     preview.textContent = 'JS';
