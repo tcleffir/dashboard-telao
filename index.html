@@ -984,6 +984,59 @@ const DataService = {
     } else if (!_lorenzo.sobrenome) {
       _lorenzo.sobrenome = 'Zanussi';
     }
+
+    /* Migração 9: Remove eventos de Jan/Fev/Mar 2026 do cache
+       Meses anteriores são cobertos pelo historico_2026 no gráfico.
+       O ranking Q1 deve contar apenas eventos de Abril 2026 em diante. */
+    this._cache.eventos = this._cache.eventos.filter(e => {
+      if (!e.data) return true;
+      return e.data >= '2026-04-01';
+    });
+
+    /* Migração 10: Substitui eventos de Abril 2026 com dados reais corretos
+       O Gist pode ter dados incompletos — esta migração garante os valores certos. */
+    const _fid = (nome, sobrenome) =>
+      (this._cache.equipe.find(m => m.nome === nome && (!sobrenome || m.sobrenome === sobrenome)) || {}).id || null;
+
+    this._cache.eventos = this._cache.eventos.filter(e => !e.data || !e.data.startsWith('2026-04'));
+
+    const _evAbr = [
+      /* — Reuniões realizadas — */
+      { id:'_a1a', vendedorId:_fid('Bianca'),            data:'2026-04-03', tipo:'reuniao_realizada' },
+      { id:'_a1b', vendedorId:_fid('Bianca'),            data:'2026-04-07', tipo:'reuniao_realizada' },
+      { id:'_a1c', vendedorId:_fid('Bianca'),            data:'2026-04-10', tipo:'reuniao_realizada' },
+      { id:'_a1d', vendedorId:_fid('Bianca'),            data:'2026-04-13', tipo:'reuniao_realizada' },
+      { id:'_a2a', vendedorId:_fid('Caio'),              data:'2026-04-08', tipo:'reuniao_realizada' },
+      { id:'_a3a', vendedorId:_fid('Giovanna'),          data:'2026-04-05', tipo:'reuniao_realizada' },
+      { id:'_a4a', vendedorId:_fid('Jhonatas'),          data:'2026-04-02', tipo:'reuniao_realizada' },
+      { id:'_a4b', vendedorId:_fid('Jhonatas'),          data:'2026-04-06', tipo:'reuniao_realizada' },
+      { id:'_a4c', vendedorId:_fid('Jhonatas'),          data:'2026-04-09', tipo:'reuniao_realizada' },
+      { id:'_a4d', vendedorId:_fid('Jhonatas'),          data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'_a4e', vendedorId:_fid('Jhonatas'),          data:'2026-04-14', tipo:'reuniao_realizada' },
+      { id:'_a4f', vendedorId:_fid('Jhonatas'),          data:'2026-04-16', tipo:'reuniao_realizada' },
+      { id:'_a5a', vendedorId:_fid('Luana'),             data:'2026-04-01', tipo:'reuniao_realizada' },
+      { id:'_a5b', vendedorId:_fid('Luana'),             data:'2026-04-03', tipo:'reuniao_realizada' },
+      { id:'_a5c', vendedorId:_fid('Luana'),             data:'2026-04-04', tipo:'reuniao_realizada' },
+      { id:'_a5d', vendedorId:_fid('Luana'),             data:'2026-04-08', tipo:'reuniao_realizada' },
+      { id:'_a5e', vendedorId:_fid('Luana'),             data:'2026-04-11', tipo:'reuniao_realizada' },
+      { id:'_a5f', vendedorId:_fid('Luana'),             data:'2026-04-12', tipo:'reuniao_realizada' },
+      /* — Fechamentos — */
+      { id:'_af1', vendedorId:_fid('Brunno'),            data:'2026-04-02', tipo:'fechamento', nomeCliente:'MAM Museu de Arte Moderna RJ', cidadeEstado:'Rio de Janeiro / RJ', numUnidades:1, valorGestao:3000, ednId:null },
+      { id:'_af2', vendedorId:_fid('Brenda'),            data:'2026-04-14', tipo:'fechamento', nomeCliente:'MEC Plant',                    cidadeEstado:'',                    numUnidades:1, valorGestao:2500, ednId:null },
+      { id:'_af3', vendedorId:_fid('Gabriel','Gracia'),  data:'2026-04-15', tipo:'fechamento', nomeCliente:'Maestro do Brasil',            cidadeEstado:'',                    numUnidades:2, valorGestao:2200, ednId:null },
+      { id:'_afF', vendedorId:_fid('Fábio'),             data:'2026-04-10', tipo:'fechamento', nomeCliente:'',                             cidadeEstado:'',                    numUnidades:1, valorGestao:0,    ednId:null },
+    ].filter(e => e.vendedorId);
+
+    this._cache.eventos.push(..._evAbr);
+
+    /* Migração 10b: Garante últimos fechamentos do mês na barra inferior do Q3 */
+    if (!this._cache.ultimos_fechamentos || this._cache.ultimos_fechamentos.length === 0) {
+      this._cache.ultimos_fechamentos = [
+        { cliente: 'Maestro do Brasil',            executivo: 'Gabriel Gracia',    valor: 2200, data: '15/04/2026' },
+        { cliente: 'MEC Plant',                    executivo: 'Brenda Gino',       valor: 2500, data: '14/04/2026' },
+        { cliente: 'MAM Museu de Arte Moderna RJ', executivo: 'Brunno Meneguette', valor: 3000, data: '02/04/2026' },
+      ];
+    }
   },
 
   getVendedores()        { return this._cache.equipe; },
