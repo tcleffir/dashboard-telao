@@ -1263,8 +1263,16 @@ const RankingEngine = {
     const projReunTotal = countEdns * metaReunPorEdn;
     const projReun = Array(12).fill(0).map((_, i) => i <= mesAtual ? reunioes2026[i] : projReunTotal);
 
-    /* Projeção de fechamentos: linear (média dos meses concluídos × 12) */
-    const projFech  = this._projetar(fechamentos2026, mesAtual);
+    /* Projeção de fechamentos: 20% das reuniões realizadas 2 meses antes
+       Ex.: projeção de Abril = 20% das reuniões de Fevereiro
+       Para Jan/Fev 2026 usa o histórico de Nov/Dez 2025 como base. */
+    const projFech = Array(12).fill(0).map((_, m) => {
+      const idx  = m - 2; // mês de referência (2 meses antes)
+      const reun = idx < 0
+        ? (hist.reunioes[12 + idx] || 0)  // Nov ou Dez de 2025
+        : (reunioes2026[idx]       || 0); // mês anterior de 2026
+      return reun > 0 ? Math.round(reun * 0.20) : 0;
+    });
 
     return {
       reunioes:   { hist2025: hist.reunioes,   real2026: reunioes2026, proj2026: projReun },
