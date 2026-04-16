@@ -1067,6 +1067,19 @@ const DataService = {
         { cliente: 'MAM Museu de Arte Moderna RJ', executivo: 'Brunno Meneguette', valor: 3000, data: '02/04/2026' },
       ];
     }
+
+    /* Migração 12: Histórico 2025 e 2026 — CLÁUSULA PÉTREA
+       Estes dados reais nunca devem ser sobrescritos pelo Gist ou localStorage. */
+    const _H25_REUN = [14, 21,  7, 22, 30, 39, 65, 62, 83, 68, 36, 16];
+    const _H25_FECH = [ 4,  8,  2,  4,  8,  5,  5,  5,  7,  7,  3,  1];
+    this._cache.historico_2025.reunioes    = _H25_REUN;
+    this._cache.historico_2025.fechamentos = _H25_FECH;
+
+    /* Histórico 2026: Jan-Mar são dados reais fixos; Abr em diante usa live */
+    const _H26_REUN = [21, 32, 36,  0,  0,  0,  0,  0,  0,  0,  0,  0];
+    const _H26_FECH = [10,  0,  2,  4,  0,  0,  0,  0,  0,  0,  0,  0];
+    _H26_REUN.forEach((v, i) => { if (v > 0) this._cache.historico_2026.reunioes[i]    = v; });
+    _H26_FECH.forEach((v, i) => { if (v > 0) this._cache.historico_2026.fechamentos[i] = v; });
   },
 
   getVendedores()        { return this._cache.equipe; },
