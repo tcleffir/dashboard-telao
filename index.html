@@ -1280,10 +1280,8 @@ const RankingEngine = {
        Ex.: projeção de Abril = 20% das reuniões de Fevereiro
        Para Jan/Fev 2026 usa o histórico de Nov/Dez 2025 como base. */
     const projFech = Array(12).fill(0).map((_, m) => {
-      const idx  = m - 2; // mês de referência (2 meses antes)
-      const reun = idx < 0
-        ? (hist.reunioes[12 + idx] || 0)  // Nov ou Dez de 2025
-        : (reunioes2026[idx]       || 0); // mês anterior de 2026
+      if (m < 2) return 0; // Janeiro e Fevereiro: sem projeção
+      const reun = reunioes2026[m - 2] || 0; // reuniões realizadas 2 meses antes (dentro de 2026)
       return reun > 0 ? Math.round(reun * 0.20) : 0;
     });
 
