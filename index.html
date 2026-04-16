@@ -993,6 +993,36 @@ const DataService = {
       return e.data >= '2026-04-01';
     });
 
+    /* Migração 11: Garante equipe completa — cláusula pétrea
+       Se o Gist tiver equipe incompleta, injeta os membros faltantes pelo nome. */
+    const _EQUIPE_CORRETA = [
+      { nome: 'Bianca',   sobrenome: 'Oliveira',   perfil: 'EDN',       id: 'edn1'  },
+      { nome: 'Caio',     sobrenome: 'Dorneles',   perfil: 'EDN',       id: 'edn2'  },
+      { nome: 'Giovanna', sobrenome: 'Bispo',      perfil: 'EDN',       id: 'edn3'  },
+      { nome: 'Jhonatas', sobrenome: 'Baldez',     perfil: 'EDN',       id: 'edn4'  },
+      { nome: 'Gabriel',  sobrenome: 'Veiga',      perfil: 'EDN',       id: 'edn5'  },
+      { nome: 'Lorenzo',  sobrenome: 'Zanussi',    perfil: 'EDN',       id: 'edn6'  },
+      { nome: 'Brenda',   sobrenome: 'Gino',       perfil: 'Executivo', id: 'exec1' },
+      { nome: 'Brunno',   sobrenome: 'Meneguette', perfil: 'Executivo', id: 'exec2' },
+      { nome: 'Luana',    sobrenome: 'Furtado',    perfil: 'Ambos',     id: 'exec3' },
+      { nome: 'Vanessa',  sobrenome: 'Moral',      perfil: 'Executivo', id: 'exec4' },
+      { nome: 'Gabriel',  sobrenome: 'Gracia',     perfil: 'Executivo', id: 'exec5' },
+      { nome: 'Fábio',    sobrenome: '',           perfil: 'Executivo', id: 'execF', ocultarTelao: true },
+    ];
+    _EQUIPE_CORRETA.forEach(esp => {
+      const existe = this._cache.equipe.find(v =>
+        v.nome === esp.nome && (!esp.sobrenome || v.sobrenome === esp.sobrenome)
+      );
+      if (!existe) {
+        this._cache.equipe.push({ ...esp, foto: null });
+      } else {
+        /* Garante perfil e ocultarTelao corretos mesmo se existir */
+        if (existe.perfil !== esp.perfil) existe.perfil = esp.perfil;
+        if (esp.ocultarTelao && !existe.ocultarTelao) existe.ocultarTelao = true;
+        if (esp.sobrenome && !existe.sobrenome) existe.sobrenome = esp.sobrenome;
+      }
+    });
+
     /* Migração 10: Substitui eventos de Abril 2026 com dados reais corretos
        O Gist pode ter dados incompletos — esta migração garante os valores certos. */
     const _fid = (nome, sobrenome) =>
